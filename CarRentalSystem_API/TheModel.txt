@@ -1,0 +1,53 @@
+ 
+ // Model Vehicle
+    public class Vehicle:
+
+ public enum VehicleStatus
+    {
+        Available,
+        Rented,
+        Maintenance
+    }
+   
+   public enum FuelType
+{
+    Petrol,
+    Diesel,
+    Hybrid,
+    EV
+}
+
+    // model User:
+      public enum UserStatus
+    {
+        Active,
+        Inactive,
+        Pending,
+        Suspended
+    }
+
+    //transaction model:
+     public enum TransactionType
+    {
+        InitialPayment,
+        ExtensionPayment,
+        Refund
+    }
+
+    public enum PaymentStatus
+    {
+        Pending,
+        Success,
+        Failed
+    }
+
+    //model booking
+     public enum BookingStatus
+    {
+        Pending,
+        Confirmed,
+        Cancelled,
+        Completed
+    }
+
+    Scrypt.NET
