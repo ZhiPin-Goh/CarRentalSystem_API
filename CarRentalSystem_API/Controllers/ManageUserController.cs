@@ -49,7 +49,7 @@ namespace CarRentalSystem_API.Controllers
                 return BadRequest("A user with the same email and phone number already exists.");
             _db.Users.Add(new User
             {
-                Username = createUser.UserName,
+                UserName = createUser.UserName,
                 Email = createUser.Email,
                 PhoneNumber = createUser.PhoneNumber,
                 Password = encoder.Encode(createUser.Password),
@@ -80,7 +80,7 @@ namespace CarRentalSystem_API.Controllers
                     return BadRequest("An account with the same email or phone number already exists but is inactive. Please contact support.");
                 else if (existingUser.Status == "Pending")
                 {
-                    existingUser.Username = createUser.UserName;
+                    existingUser.UserName = createUser.UserName;
                     existingUser.Password = createUser.Password;
                     existingUser.Password = createUser.Password;
                     existingUser.PhoneNumber = createUser.PhoneNumber;
@@ -93,7 +93,7 @@ namespace CarRentalSystem_API.Controllers
             {
                 var newUser = new User
                 {
-                    Username = createUser.UserName,
+                    UserName = createUser.UserName,
                     Email = createUser.Email,
                     PhoneNumber = createUser.PhoneNumber,
                     Password = createUser.Password,
@@ -211,7 +211,74 @@ namespace CarRentalSystem_API.Controllers
             user.OTPGeneratedAt = DateTime.Now;
             _db.Entry(user).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-            return Ok();
+            string emailBody = $@"
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset=""UTF-8"">
+                </head>
+                <body style=""margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;"">
+    
+                    <div style=""width: 100%; background-color: #f3f4f6; padding: 40px 0;"">
+        
+                        <div style=""max-width: 500px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); overflow: hidden;"">
+            
+                            <div style=""background-color: #111827; padding: 25px 30px; text-align: left;"">
+                                <h1 style=""margin: 0; color: #ffffff; font-size: 22px; font-weight: bold; letter-spacing: -0.5px; text-transform: uppercase;"">
+                                    Drive<span style=""color: #3b82f6;"">Link</span>
+                                </h1>
+                            </div>
+            
+                            <div style=""padding: 30px; color: #374151; line-height: 1.6;"">
+                
+                                <h2 style=""margin: 0 0 20px 0; font-size: 18px; color: #111827;"">
+                                    New Verification Code Requested
+                                </h2>
+                
+                                <p style=""margin: 0 0 15px 0; font-size: 15px;"">
+                                    Hi <strong>{user.UserName}</strong>,
+                                </p>
+                                <p style=""margin: 0 0 20px 0; font-size: 15px; color: #4b5563;"">
+                                    We received a request to resend your OTP. Here is your new Start Code to access your DriveLink account:
+                                </p>
+                
+                                <div style=""background-color: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 0 6px 6px 0; text-align: center; padding: 20px; margin: 25px 0;"">
+                                    <p style=""margin: 0 0 8px 0; font-size: 12px; color: #3b82f6; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;"">
+                                        Your Start Code
+                                    </p>
+                                    <p style=""margin: 0; font-size: 40px; font-weight: bold; color: #1e3a8a; letter-spacing: 10px;"">
+                                        {otp}
+                                    </p>
+                                </div>
+                
+                                <p style=""margin: 0 0 25px 0; font-size: 14px; color: #6b7280;"">
+                                    Please enter this code in the app. It will expire in 10 minutes. Do not share this code with anyone.
+                                </p>
+
+                                <div style=""background-color: #fef2f2; border: 1px solid #fca5a5; border-radius: 6px; padding: 15px; margin-top: 10px;"">
+                                    <p style=""margin: 0; font-size: 13px; color: #991b1b;"">
+                                        <strong>⚠️ Security Alert:</strong> If you did not request a new code, someone may be trying to access your account. Please ignore this email or contact our support team immediately.
+                                    </p>
+                                </div>
+                            </div>
+            
+                            <div style=""background-color: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;"">
+                                <p style=""margin: 0; color: #6b7280; font-size: 13px;"">Safe travels, <br/><strong style=""color: #111827;"">The DriveLink Team</strong></p>
+                            </div>
+            
+                        </div>
+                    </div>
+                </body>
+                </html>";
+            try
+            {
+                await GeneralServices.SendEmail(user.Email, "Resend OTP for Account Verification", emailBody);
+                return Ok("OTP resent successfully. Please check your email for the new OTP.");
+            }
+            catch(Exception ex)
+            {
+                return StatusCode(500, "Failed to resend OTP email. Please contact support." + ex.Message);
+            }
         }
 
     }
