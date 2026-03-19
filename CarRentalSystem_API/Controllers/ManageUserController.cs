@@ -402,7 +402,7 @@ namespace CarRentalSystem_API.Controllers
             bool isPasswordValid = encoder.Compare(login.Password, user.Password);
             if (!isPasswordValid)
                 return BadRequest("Invalid password. Please try again.");
-                
+
             if (user.Status != "Active")
                 return BadRequest("User account is not active. Please verify your account or contact support.");
         
@@ -412,6 +412,43 @@ namespace CarRentalSystem_API.Controllers
                 UserID = user.UserID,
                 Email = user.Email,
             });
+        }
+        [HttpPost]
+        public async Task<IActionResult> UpdateUser([FromBody] UpdateUserDTO updateUser)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == updateUser.UserID);
+            if (user == null)
+                return NotFound("User not found.");
+            if (!System.Text.RegularExpressions.Regex.IsMatch(updateUser.PhoneNumber.ToString(), phonePattern))
+                return BadRequest("Invalid phone number format. Format: 01X-XXXXXXX");
+            if (!System.Text.RegularExpressions.Regex.IsMatch(updateUser.Email, emailPattern))
+                return BadRequest("Invalid email format.");
+
+            var existingUser = await _db.Users.AnyAsync(u => u.Email == updateUser.Email && u.PhoneNumber == updateUser.PhoneNumber && u.UserID != updateUser.UserID);
+            if (existingUser)
+                return BadRequest("A user with the same email and phone number already exists.");
+            user.UserName = updateUser.UserName;
+            user.Email = updateUser.Email;
+            user.PhoneNumber = updateUser.PhoneNumber;
+            _db.Entry(user).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok("User updated successfully.");
+        }
+        [HttpPost]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePassword changePassword)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == changePassword.UserID);
+            if (user == null)
+                return NotFound("User not found.");
+            var isCurrentPasswordValid = encoder.Compare(changePassword.CurrentPassword, user.Password);
+            if (!isCurrentPasswordValid)
+                return BadRequest("Current password is incorrect. Please try again.");
+            if (!System.Text.RegularExpressions.Regex.IsMatch(changePassword.NewPassword, passwordPattern))
+                return BadRequest("New password must be at least 8 characters long and include uppercase, lowercase, digit, and special character.");
+            user.Password = encoder.Encode(changePassword.NewPassword);
+            _db.Entry(user).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok("Password changed successfully.");
         }
     }
 }
