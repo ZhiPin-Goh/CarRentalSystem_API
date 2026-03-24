@@ -450,5 +450,27 @@ namespace CarRentalSystem_API.Controllers
             await _db.SaveChangesAsync();
             return Ok("Password changed successfully.");
         }
+        [HttpPost("{id}")]
+        public async Task<IActionResult> ActiveUser([FromBody]int id)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == id);
+            if (user == null)
+                return NotFound("User not found.");
+            user.Status = "Active";
+            _db.Entry(user).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok("User activated successfully.");
+        }
+        [HttpPost("{id}")]
+        public async Task<IActionResult> InactiveUser([FromBody] int id)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == id);
+            if (user == null)
+                return NotFound("User not found.");
+            user.Status = "Inactive";
+            _db.Entry(user).State = EntityState.Modified;
+            await _db.SaveChangesAsync();
+            return Ok("User inactivated successfully.");
+        }
     }
 }
