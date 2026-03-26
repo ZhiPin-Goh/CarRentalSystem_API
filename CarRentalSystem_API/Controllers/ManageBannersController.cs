@@ -105,5 +105,124 @@ namespace CarRentalSystem_API.Controllers
                 return StatusCode(500, $"An error occurred while creating the banner: {ex.Message}");
             }
         }
+        [HttpPost]
+        public async Task<IActionResult> UpdateBanner([FromForm] UpdateBannersDTO updateBanners)
+        {
+            try
+            {
+                var banner = await _db.Banners.FirstOrDefaultAsync(b => b.BannersID == updateBanners.ID);
+                if(banner == null)
+                    return NotFound("Banner not found.");
+                if(updateBanners.ImageUrl != null)
+                {
+                    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                    var ext = Path.GetExtension(updateBanners.ImageUrl.FileName).ToLowerInvariant();
+                    if (string.IsNullOrEmpty(ext) || !allowedExtensions.Contains(ext))
+                    {
+                        return BadRequest("Invalid file type. Only image files are allowed.");
+                    }
+                    var cloudName = _config["CloudinarySettings:CloudName"];
+                    var apiKey = _config["CloudinarySettings:ApiKey"];
+                    var apiSecret = _config["CloudinarySettings:ApiSecret"];
+
+                    Account account = new Account(cloudName, apiKey, apiSecret);
+                    Cloudinary cloudinary = new Cloudinary(account);
+                    cloudinary.Api.Secure = true;
+
+                    string publicID = ExtractPublicIdFromUrl(banner.ImageURL);
+                    if (!string.IsNullOrEmpty(publicID))
+                    {
+                        var deletionParams = new DeletionParams(publicID);
+                        var deletionResult = cloudinary.Destroy(deletionParams);
+                        if (deletionResult.Result != "ok")
+                        {
+                            return StatusCode(500, "Failed to delete the old image from Cloudinary.");
+                        }
+                    }
+                    var uploadFolder = new ImageUploadResult();
+                    using (var stream = updateBanners.ImageUrl.OpenReadStream())
+                    {
+                        var uploadParams = new ImageUploadParams()
+                        {
+                            File = new FileDescription(updateBanners.ImageUrl.FileName, stream),
+                            Folder = "Car Rental System/Banners"
+                        };
+                        uploadFolder = cloudinary.Upload(uploadParams);
+                    }
+                    if (uploadFolder == null || string.IsNullOrEmpty(uploadFolder.SecureUrl.AbsoluteUri))
+                    {
+                        return StatusCode(500, "Image upload failed.");
+                    }
+                    banner.ImageURL = uploadFolder.SecureUrl.AbsoluteUri;
+                }
+                else
+                {
+                    banner.ImageURL = banner.ImageURL;
+                }
+                banner.Title = updateBanners.Title;
+                banner.Description = string.IsNullOrEmpty(updateBanners.Description) ? updateBanners.Title : updateBanners.Description;
+                banner.TargetURL = updateBanners.TargetUrl;
+                await _db.SaveChangesAsync();
+                return Ok("Banner updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred while updating the banner: {ex.Message}");
+            }
+        }
+        [HttpPost("{id}")]
+        public async Task<IActionResult> DeleteBanner(int id)
+        {
+            try
+            {
+                var banner = await _db.Banners.FirstOrDefaultAsync(b => b.BannersID == id);
+                if (banner == null)
+                    return NotFound("Banner not found.");
+                var cloudName = _config["CloudinarySettings:CloudName"];
+                var apiKey = _config["CloudinarySettings:ApiKey"];
+                var apiSecret = _config["CloudinarySettings:ApiSecret"];
+                Account account = new Account(cloudName, apiKey, apiSecret);
+                Cloudinary cloudinary = new Cloudinary(account);
+                cloudinary.Api.Secure = true;
+
+                string publicID = ExtractPublicIdFromUrl(banner.ImageURL);
+                if (!string.IsNullOrEmpty(publicID))
+                {
+                    var deletionParams = new DeletionParams(publicID);
+                    var deletionResult = cloudinary.Destroy(deletionParams);
+                    if (deletionResult.Result != "ok")
+                    {
+                        return StatusCode(500, "Failed to delete the image from Cloudinary.");
+                    }
+                }
+                _db.Banners.Remove(banner);
+                await _db.SaveChangesAsync();
+                return Ok("Banner deleted successfully.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred while deleting the banner: {ex.Message}");
+            }
+        }
+        private string ExtractPublicIdFromUrl(string url)
+        {
+            if(string.IsNullOrEmpty(url))
+                return string.Empty;
+            
+            string folderName = "Car Rental System/Banners/";
+            int startIndex = url.IndexOf(folderName);
+            if (startIndex != -1)
+            {
+                string publicIdWithExtension = url.Substring(startIndex);
+
+                int lastDotIndex = publicIdWithExtension.LastIndexOf('.');
+                if (lastDotIndex != -1)
+                {
+                    return publicIdWithExtension.Substring(0, lastDotIndex);
+                }
+                return publicIdWithExtension;
+            }
+            return string.Empty;
+        }
     }
 }
