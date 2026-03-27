@@ -1,4 +1,5 @@
-﻿using CarRentalSystem_API.Models;
+﻿using System.ComponentModel.DataAnnotations;
+using CarRentalSystem_API.Models;
 
 namespace CarRentalSystem_API.DTO.VehicleDTO
 {
@@ -11,9 +12,11 @@ namespace CarRentalSystem_API.DTO.VehicleDTO
         public decimal DailyRate { get; set; }
         public string Type { get; set; }
         public string FuelType { get; set; }
-        public IFormFile ImageVehicle { get; set; }
+        [Required]
+        public IFormFile PrimaryImage { get; set; }
+        public List<IFormFile>? AdditionalImages { get; set; }
         public string? SpecsInfo { get; set; }
-        
+
     }
-   
+
 }

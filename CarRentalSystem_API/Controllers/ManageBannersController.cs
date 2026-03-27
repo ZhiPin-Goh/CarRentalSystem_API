@@ -1,4 +1,5 @@
 using CarRentalSystem_API.DTO.BannersDTO;
+using CarRentalSystem_API.Function;
 using CarRentalSystem_API.Models;
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
@@ -129,7 +130,7 @@ namespace CarRentalSystem_API.Controllers
                     Cloudinary cloudinary = new Cloudinary(account);
                     cloudinary.Api.Secure = true;
 
-                    string publicID = ExtractPublicIdFromUrl(banner.ImageURL);
+                    string publicID = ExtractPublicURL.ExtractPublicIDFromUrl(banner.ImageURL);
                     if (!string.IsNullOrEmpty(publicID))
                     {
                         var deletionParams = new DeletionParams(publicID);
@@ -185,7 +186,7 @@ namespace CarRentalSystem_API.Controllers
                 Cloudinary cloudinary = new Cloudinary(account);
                 cloudinary.Api.Secure = true;
 
-                string publicID = ExtractPublicIdFromUrl(banner.ImageURL);
+                string publicID = ExtractPublicURL.ExtractPublicIDFromUrl(banner.ImageURL);
                 if (!string.IsNullOrEmpty(publicID))
                 {
                     var deletionParams = new DeletionParams(publicID);
@@ -204,25 +205,6 @@ namespace CarRentalSystem_API.Controllers
                 return StatusCode(500, $"An error occurred while deleting the banner: {ex.Message}");
             }
         }
-        private string ExtractPublicIdFromUrl(string url)
-        {
-            if(string.IsNullOrEmpty(url))
-                return string.Empty;
-            
-            string folderName = "Car Rental System/Banners/";
-            int startIndex = url.IndexOf(folderName);
-            if (startIndex != -1)
-            {
-                string publicIdWithExtension = url.Substring(startIndex);
-
-                int lastDotIndex = publicIdWithExtension.LastIndexOf('.');
-                if (lastDotIndex != -1)
-                {
-                    return publicIdWithExtension.Substring(0, lastDotIndex);
-                }
-                return publicIdWithExtension;
-            }
-            return string.Empty;
-        }
+      
     }
 }

@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CarRentalSystem_API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260317133344_InitialCreate")]
+    [Migration("20260327030120_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -297,7 +297,7 @@ namespace CarRentalSystem_API.Migrations
                     b.Property<string>("TelegramID")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Username")
+                    b.Property<string>("UserName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -387,7 +387,7 @@ namespace CarRentalSystem_API.Migrations
                         .HasForeignKey("PromotionID");
 
                     b.HasOne("CarRentalSystem_API.Models.User", "User")
-                        .WithMany()
+                        .WithMany("Bookings")
                         .HasForeignKey("UserID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -441,6 +441,11 @@ namespace CarRentalSystem_API.Migrations
             modelBuilder.Entity("CarRentalSystem_API.Models.Booking", b =>
                 {
                     b.Navigation("Transactions");
+                });
+
+            modelBuilder.Entity("CarRentalSystem_API.Models.User", b =>
+                {
+                    b.Navigation("Bookings");
                 });
 
             modelBuilder.Entity("CarRentalSystem_API.Models.Vehicle", b =>
