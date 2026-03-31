@@ -1,4 +1,5 @@
 using CarRentalSystem_API.Function;
+using CarRentalSystem_API.Function.BackgroundServices;
 using CarRentalSystem_API.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,7 +22,10 @@ builder.WebHost.ConfigureKestrel(options =>
 {
     options.Limits.MaxRequestBodySize = 1073741824; // 1 GB
 });
+
 builder.Services.AddHostedService<VehicleStatusUpdateService>();
+builder.Services.AddHostedService<BannersStatusUpdateServices>();
+
 var app = builder.Build();
 app.UseStaticFiles();
 // Configure the HTTP request pipeline.

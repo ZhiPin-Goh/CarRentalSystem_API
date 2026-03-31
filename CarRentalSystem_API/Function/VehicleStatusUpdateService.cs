@@ -15,14 +15,15 @@ namespace CarRentalSystem_API.Function
         // Automatically updates vehicle status based on maintenance records daily
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                while (!stoppingToken.IsCancellationRequested)
+                try
                 {
                     using (var scope = _serviceProvider.CreateScope())
                     {
                         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                        var today = DateTime.UtcNow.Date;
+
+                        var today = DateTime.Now.Date;
 
                         var vehiclesToMaintenance = await db.MaintenanceRecords
                             .Where(m => m.StartDate == today)
@@ -38,21 +39,22 @@ namespace CarRentalSystem_API.Function
                             .Where(m => m.EndDate == today)
                             .Select(m => m.Vehicle)
                             .ToListAsync();
+
                         foreach (var vehicle in vehiclesToAvailable)
                         {
                             vehicle.Status = "Available";
                         }
 
                         await db.SaveChangesAsync();
+                        _logger.LogInformation("Vehicle statuses updated successfully at " + DateTime.Now);
                     }
                 }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "An error occurred while updating vehicle statuses.");
+                }
+                await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An error occurred while updating vehicle statuses.");
-                return;
-            }
-            await Task.Delay(TimeSpan.FromDays(1), stoppingToken);
         }
     }
 }
