@@ -1,41 +1,26 @@
-using CarRentalSystem_API.DTO.BannersDTO;
+﻿using CarRentalSystem_API.DTO.BannersDTO;
 using CarRentalSystem_API.Function;
+using System.Linq;
 using CarRentalSystem_API.Models;
-using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
+using CloudinaryDotNet;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
-namespace CarRentalSystem_API.Controllers
+namespace CarRentalSystem_API.Controllers.AdminControllers
 {
     [ApiController]
     [Route("api/[controller]/[action]")]
-    public class ManageBannersController : Controller
+    public class BannersManagementController : Controller
     {
         private readonly AppDbContext _db;
         private readonly IConfiguration _config;
-        public ManageBannersController(AppDbContext db, IConfiguration config)
+        public BannersManagementController(AppDbContext db, IConfiguration config)
         {
             _db = db;
             _config = config;
         }
-        // This is used to get all the banners for the home page, it will return only the active banners that are within the start and end date range
-        [HttpGet]
-        public async Task<IActionResult> GetBanners()
-        {
-            var banners = await _db.Banners
-            .Where(x => x.StartDate <= DateTime.UtcNow && x.EndDate >= DateTime.UtcNow && x.IsActive)
-            .OrderBy(x => x.SortOrder)
-            .Select(x => new
-            {
-                x.Title,
-                x.Description,
-                x.ImageURL,
-                x.TargetURL,
-            }).ToListAsync();
-            return Ok(banners);
-        }
-        //This is admin only, it will return all the banners regardless of the active status and date range
         [HttpGet]
         public async Task<IActionResult> GetAllBanners()
         {
@@ -112,9 +97,9 @@ namespace CarRentalSystem_API.Controllers
             try
             {
                 var banner = await _db.Banners.FirstOrDefaultAsync(b => b.BannersID == updateBanners.ID);
-                if(banner == null)
+                if (banner == null)
                     return NotFound("Banner not found.");
-                if(updateBanners.ImageUrl != null)
+                if (updateBanners.ImageUrl != null)
                 {
                     var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
                     var ext = Path.GetExtension(updateBanners.ImageUrl.FileName).ToLowerInvariant();
@@ -205,6 +190,5 @@ namespace CarRentalSystem_API.Controllers
                 return StatusCode(500, $"An error occurred while deleting the banner: {ex.Message}");
             }
         }
-      
     }
 }

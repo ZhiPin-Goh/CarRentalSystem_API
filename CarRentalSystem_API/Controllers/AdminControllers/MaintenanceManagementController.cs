@@ -3,14 +3,14 @@ using CarRentalSystem_API.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace CarRentalSystem_API.Controllers
+namespace CarRentalSystem_API.Controllers.AdminControllers
 {
-    [ApiController]
     [Route("api/[controller]/[action]")]
-    public class ManageMaintenanceController : Controller
+    [ApiController]
+    public class MaintenanceManagementController : Controller
     {
         private readonly AppDbContext _db;
-        public ManageMaintenanceController(AppDbContext db)
+        public MaintenanceManagementController(AppDbContext db)
         {
             _db = db;
         }
