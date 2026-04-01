@@ -16,5 +16,6 @@ namespace CarRentalSystem_API.Models
         public DbSet<Banners> Banners { get; set; }
         public DbSet<News> News { get; set; }
         public DbSet<VehicleImage> VehicleImages { get; set; }
+        public DbSet<TokenActivity> TokenActivities { get; set; }
     }
 }

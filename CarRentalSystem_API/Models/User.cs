@@ -13,7 +13,7 @@
         public string? OTP { get; set; }
         public DateTime? OTPGeneratedAt { get; set; }
         public virtual ICollection<Booking> Bookings { get; set; }
-
+        public virtual ICollection<TokenActivity> TokenActivities { get; set; }
     }
   
 }
