@@ -1,4 +1,3 @@
-using CarRentalSystem_API.Function;
 using CarRentalSystem_API.Function.BackgroundServices;
 using CarRentalSystem_API.Models;
 using Microsoft.EntityFrameworkCore;
