@@ -23,6 +23,7 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 builder.Services.AddHostedService<VehicleStatusUpdateService>();
+builder.Services.AddHostedService<UserStatusDeleteServices>();
 builder.Services.AddHostedService<BannersStatusUpdateServices>();
 
 var app = builder.Build();

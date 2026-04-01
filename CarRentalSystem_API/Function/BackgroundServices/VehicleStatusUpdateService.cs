@@ -1,7 +1,7 @@
 ﻿using CarRentalSystem_API.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace CarRentalSystem_API.Function
+namespace CarRentalSystem_API.Function.BackgroundServices
 {
     public class VehicleStatusUpdateService : BackgroundService
     {

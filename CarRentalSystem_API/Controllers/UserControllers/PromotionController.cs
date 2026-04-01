@@ -4,22 +4,22 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CarRentalSystem_API.Controllers.UserControllers
 {
-    [ApiController]
     [Route("api/[controller]/[action]")]
-    public class VehicleController : Controller
+    [ApiController]
+    public class PromotionController : Controller
     {
         private readonly AppDbContext _db;
-        public VehicleController(AppDbContext db)
+        public PromotionController(AppDbContext db)
         {
             _db = db;
         }
         [HttpGet]
-        public async Task<IActionResult> GetAvailabelVehicle()
+        public async Task<IActionResult> GetActivePromotions()
         {
-            var vehicles = await _db.Vehicles
-                .Where(v => v.Status == "Available")
+            var promotions = await _db.Promotions
+                .Where(p => p.IsActive && p.StartDate <= DateTime.UtcNow && p.EndDate >= DateTime.UtcNow)
                 .ToListAsync();
-            return Ok(vehicles);
+            return Ok(promotions);
         }
     }
 }

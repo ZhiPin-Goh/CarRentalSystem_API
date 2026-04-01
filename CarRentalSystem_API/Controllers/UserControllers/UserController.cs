@@ -30,24 +30,110 @@ namespace CarRentalSystem_API.Controllers.UserControllers
 
             return Ok(user);
         }
+        
+        // This is create user not authentication the email and password, just create user for admin
+        [HttpPost]
+        public async Task<IActionResult> CreateUserAdmin([FromBody] CreateUserDTO createUser)
+        {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.PhoneNumber.ToString(), phonePattern))
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid Phone Number Format",
+                    message = "Invalid phone number format. Format: 01X-XXXXXXX"
+                });
+            }
+            if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.Password, passwordPattern))
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid Password Format",
+                    message = "Password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
+                });
+            }
+
+            if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.Email, emailPattern))
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid Email Format",
+                    message = "Invalid email format."
+                });
+            }
+            var existingUser = await _db.Users.AnyAsync(u => u.Email == createUser.Email && u.PhoneNumber == createUser.PhoneNumber);
+            if (existingUser)
+            {
+                return BadRequest(new
+                {
+                    error = "User Already Exists",
+                    message = "A user with the same email and phone number already exists."
+                });
+            }
+            _db.Users.Add(new User
+            {
+                UserName = createUser.UserName,
+                Email = createUser.Email,
+                PhoneNumber = createUser.PhoneNumber,
+                Password = encoder.Encode(createUser.Password),
+                Status = "Active",
+                DriverLicenseNumber = null,
+                TelegramID = null
+            });
+            await _db.SaveChangesAsync();
+            return Ok(new
+            {
+                Message = "User created successfully.",
+                UserID = _db.Users.OrderByDescending(u => u.UserID).FirstOrDefault().UserID
+            });
+        }
         [HttpPost]
         public async Task<IActionResult> SignUpUser([FromBody] CreateUserDTO createUser)
         {
 
             if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.PhoneNumber.ToString(), phonePattern))
-                return BadRequest("Invalid phone number format. Format: 01X-XXXXXXX");
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid Phone Number Format",
+                    message = "Invalid phone number format. Format: 01X-XXXXXXX"
+                });
+            }
             if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.Password, passwordPattern))
-                return BadRequest("Password must be at least 8 characters long and include uppercase, lowercase, digit, and special character.");
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid Password Format",
+                    message = "Password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
+                });
+            }
             if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.Email, emailPattern))
-                return BadRequest("Invalid email format.");
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid Email Format",
+                    message = "Invalid email format."
+                });
+            }
             string otp = GeneralServices.GenerateNumber(6);
             var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == createUser.Email && u.PhoneNumber == createUser.PhoneNumber);
             if (existingUser != null)
             {
                 if (existingUser.Status == "Active")
-                    return BadRequest("An account with the same email or phone number already exists.");
+                {
+                    return BadRequest(new
+                    {
+                        error = "User Already Exists",
+                        message = "A user with the same email and phone number already exists."
+                    });
+                }
                 else if (existingUser.Status == "Inactive")
-                    return BadRequest("An account with the same email or phone number already exists but is inactive. Please contact support.");
+                {
+                    return BadRequest(new
+                    {
+                        error = "User Account Inactive",
+                        message = "Your account is inactive. Please contact support for assistance."
+                    });
+                }
                 else if (existingUser.Status == "Pending")
                 {
                     existingUser.UserName = createUser.UserName;
@@ -150,33 +236,71 @@ namespace CarRentalSystem_API.Controllers.UserControllers
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == verify.Email);
             if (user == null)
-                return NotFound("User not found.");
+            {
+                return NotFound(new
+                {
+                    error = "User Not Found",
+                    message = "User not found."
+                });
+            }
             if (user.Status == "Active")
-                return BadRequest("User is already verified and active.");
-            if (user.OTPGeneratedAt.HasValue && user.OTPGeneratedAt.Value.AddMinutes(10) < DateTime.Now)
-                return BadRequest("OTP has expired. Please request a new OTP.");
+            {
+                return BadRequest(new
+                {
+                    error = "User Already Active",
+                    message = "Your account is already active. Please log in."
+                });
 
+            }
+            if (user.OTPGeneratedAt.HasValue && user.OTPGeneratedAt.Value.AddMinutes(10) < DateTime.Now)
+            {
+                return BadRequest(new
+                {
+                    error = "OTP Expired",
+                    message = "OTP has expired. Please request a new OTP."
+                });
+            }
             if (user.OTP == verify.OTP)
             {
                 user.Status = "Active";
                 _db.Entry(user).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
-                return Ok("OTP verified successfully.");
+                return Ok(new
+                {
+                    Message = "OTP verified successfully. Your account is now active.",
+                    UserID = user.UserID,
+                    Email = user.Email
+                });
             }
             else
             {
-                return BadRequest("Invalid OTP. Please check your email and try again.");
+                return BadRequest(new
+                {
+                    error = "Invalid OTP",
+                    message = "Invalid OTP. Please check your email and try again."
+                });
             }
         }
-        [Route("ResendOTP")]
         [HttpPost]
         public async Task<IActionResult> ResendOTP([FromBody] EmailDTO email)
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == email.Email);
             if (user == null)
-                return NotFound("User not found.");
+            {
+                return NotFound(new
+                {
+                    error = "User Not Found",
+                    message = "User not found."
+                });
+            }
             if (user.Status == "Inactive")
-                return BadRequest("User account is inactive. Please contact support");
+            {
+                return BadRequest(new
+                {
+                    error = "User Account Inactive",
+                    message = "Your account is inactive. Please contact support for assistance."
+                });
+            }
             string otp = GeneralServices.GenerateNumber(6);
             user.OTP = otp;
             user.OTPGeneratedAt = DateTime.Now;
@@ -244,11 +368,19 @@ namespace CarRentalSystem_API.Controllers.UserControllers
             try
             {
                 await GeneralServices.SendEmail(user.Email, "Resend OTP for Account Verification", emailBody);
-                return Ok("OTP resent successfully. Please check your email for the new OTP.");
+                return Ok(new
+                {
+                    Message = "OTP resent successfully. Please check your email for the new OTP.",
+                    Email = user.Email
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Failed to resend OTP email. Please contact support." + ex.Message);
+                return StatusCode(500, new
+                {
+                    error = "Failed to Send Email",
+                    message = "Failed to resend OTP email. Please contact support." + ex.Message
+                });
             }
         }
         [HttpPost]
@@ -256,7 +388,13 @@ namespace CarRentalSystem_API.Controllers.UserControllers
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == email.Email);
             if (user == null)
-                return NotFound("User not found.");
+            {
+                return NotFound(new
+                {
+                    error = "User Not Found",
+                    message = "User not found."
+                });
+            }
             string otp = GeneralServices.GenerateNumber(6);
             user.OTP = otp;
             user.OTPGeneratedAt = DateTime.Now;
@@ -324,11 +462,19 @@ namespace CarRentalSystem_API.Controllers.UserControllers
             try
             {
                 await GeneralServices.SendEmail(user.Email, "Password Reset Authorization Code", emailBody);
-                return Ok("Password reset OTP sent successfully. Please check your email for the authorization code.");
+                return Ok(new
+                {
+                    Message = "Password reset email sent successfully. Please check your email for the OTP to reset your password.",
+                    Email = user.Email
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "Failed to send password reset email. Please contact support." + ex.Message);
+                return StatusCode(500, new
+                {
+                    error = "Failed to Send Email",
+                    message = "Failed to send password reset email. Please contact support." + ex.Message
+                });
             }
         }
         [HttpPost]
@@ -336,17 +482,41 @@ namespace CarRentalSystem_API.Controllers.UserControllers
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == verify.Email);
             if (user == null)
-                return NotFound("User not found.");
-            if (user.OTPGeneratedAt.HasValue && user.OTPGeneratedAt.Value.AddMinutes(10) < DateTime.Now)
-                return BadRequest("OTP has expired. Please request a new OTP.");
-
-            if (user.OTP == verify.OTP)
             {
-                return Ok("OTP verified successfully. You can now reset your password.");
+                return NotFound(new
+                {
+                    error = "User Not Found",
+                    message = "User not found."
+                });
+            }
+            if (user.OTPGeneratedAt.HasValue && user.OTPGeneratedAt.Value.AddMinutes(10) < DateTime.Now)
+            {
+                return BadRequest(new
+                {
+                    error = "OTP Expired",
+                    message = "OTP has expired. Please request a new OTP."
+                });
+
             }
             else
             {
-                return BadRequest("Invalid OTP. Please check your email and try again.");
+                if (user.OTP == verify.OTP)
+                {
+                    return Ok(new
+                    {
+                        Message = "OTP verified successfully. You can now reset your password.",
+                        UserID = user.UserID,
+                        Email = user.Email
+                    });
+                }
+                else
+                {
+                    return BadRequest(new
+                    {
+                        error = "Invalid OTP",
+                        message = "Invalid OTP. Please check your email and try again."
+                    });
+                }
             }
         }
         [HttpPost]
@@ -354,28 +524,61 @@ namespace CarRentalSystem_API.Controllers.UserControllers
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == resetPassword.Email);
             if (user == null)
-                return NotFound("User not found.");
+            {
+                return NotFound(new
+                {
+                    error = "User Not Found",
+                    message = "User not found."
+                });
+            }
             if (!System.Text.RegularExpressions.Regex.IsMatch(resetPassword.NewPassword, passwordPattern))
-                return BadRequest("Password must be at least 8 characters long and include uppercase, lowercase, digit, and special character.");
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid Password Format",
+                    message = "New password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
+                });
+            }
             user.Password = encoder.Encode(resetPassword.NewPassword);
             _db.Entry(user).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-            return Ok("Password reset successfully.");
+            return Ok(new
+            {
+                Message = "Password reset successfully. You can now log in with your new password.",
+                UserID = user.UserID,
+                Email = user.Email
+            });
         }
         [HttpPost]
         public async Task<IActionResult> LoginUser([FromBody] LoginDTO login)
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == login.Email);
             if (user == null)
-                return NotFound("User not found.");
+            {
+                return NotFound(new
+                {
+                    error = "User Not Found",
+                    message = "User not found."
+                });
+            }
 
             bool isPasswordValid = encoder.Compare(login.Password, user.Password);
             if (!isPasswordValid)
-                return BadRequest("Invalid password. Please try again.");
-
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid Credentials",
+                    message = "Incorrect email or password. Please try again."
+                });
+            }
             if (user.Status != "Active")
-                return BadRequest("User account is not active. Please verify your account or contact support.");
-
+            {
+                return BadRequest(new
+                {
+                    error = "Account Not Active",
+                    message = "Your account is not active. Please verify your email or contact support."
+                });
+            }
             return Ok(new
             {
                 Message = "Login successfully",
@@ -388,37 +591,89 @@ namespace CarRentalSystem_API.Controllers.UserControllers
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == updateUser.UserID);
             if (user == null)
-                return NotFound("User not found.");
+            {
+                return NotFound(new
+                {
+                    error = "User Not Found",
+                    message = "User not found."
+                });
+            }
             if (!System.Text.RegularExpressions.Regex.IsMatch(updateUser.PhoneNumber.ToString(), phonePattern))
-                return BadRequest("Invalid phone number format. Format: 01X-XXXXXXX");
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid Phone Number Format",
+                    message = "Invalid phone number format. Format: 01X-XXXXXXX"
+                });
+            }
             if (!System.Text.RegularExpressions.Regex.IsMatch(updateUser.Email, emailPattern))
-                return BadRequest("Invalid email format.");
-
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid Email Format",
+                    message = "Invalid email format."
+                });
+            }
             var existingUser = await _db.Users.AnyAsync(u => u.Email == updateUser.Email && u.PhoneNumber == updateUser.PhoneNumber && u.UserID != updateUser.UserID);
             if (existingUser)
-                return BadRequest("A user with the same email and phone number already exists.");
+            {
+                return BadRequest(new
+                {
+                    error = "User Already Exists",
+                    message = "A user with the same email and phone number already exists."
+                });
+            }
             user.UserName = updateUser.UserName;
             user.Email = updateUser.Email;
             user.PhoneNumber = updateUser.PhoneNumber;
             _db.Entry(user).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-            return Ok("User updated successfully.");
+            return Ok(new
+            {
+                Message = "User updated successfully.",
+                UserID = user.UserID,
+                Email = user.Email,
+                PhoneNumber = user.PhoneNumber
+            });
         }
         [HttpPost]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePassword changePassword)
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == changePassword.UserID);
             if (user == null)
-                return NotFound("User not found.");
+            {
+                return NotFound(new
+                {
+                    error = "User Not Found",
+                    message = "User not found."
+                });
+            }
             var isCurrentPasswordValid = encoder.Compare(changePassword.CurrentPassword, user.Password);
             if (!isCurrentPasswordValid)
-                return BadRequest("Current password is incorrect. Please try again.");
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid Current Password",
+                    message = "Current password is incorrect. Please try again."
+                });
+            }
             if (!System.Text.RegularExpressions.Regex.IsMatch(changePassword.NewPassword, passwordPattern))
-                return BadRequest("New password must be at least 8 characters long and include uppercase, lowercase, digit, and special character.");
+            {
+                return BadRequest(new
+                {
+                    error = "Invalid New Password Format",
+                    message = "New password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
+                });
+            }
             user.Password = encoder.Encode(changePassword.NewPassword);
             _db.Entry(user).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-            return Ok("Password changed successfully.");
+            return Ok(new
+            {
+                Message = "Password changed successfully.",
+                UserID = user.UserID,
+                Email = user.Email
+            });
         }
     }
 }

@@ -56,29 +56,27 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
                 TelegramID = null
             });
             await _db.SaveChangesAsync();
-            return Ok("User created successfully.");
+            return Ok(new
+            {
+                Message = "User created successfully.",
+                UserID = _db.Users.OrderByDescending(u => u.UserID).FirstOrDefault().UserID
+            });
         }
         [HttpPost("{id}")]
-        public async Task<IActionResult> ActiveUser([FromBody] int id)
+        public async Task<IActionResult> ToggleUserStatus(int id)
         {
-            var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == id);
-            if (user == null)
-                return NotFound("User not found.");
-            user.Status = "Active";
-            _db.Entry(user).State = EntityState.Modified;
+            var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.UserID == id);
+            if (existingUser == null)
+                return NotFound($"User with ID {id} not found.");
+            existingUser.Status = existingUser.Status == "Active" ? "Inactive" : "Active";
+            _db.Entry(existingUser).State = EntityState.Modified;
             await _db.SaveChangesAsync();
-            return Ok("User activated successfully.");
-        }
-        [HttpPost("{id}")]
-        public async Task<IActionResult> InactiveUser([FromBody] int id)
-        {
-            var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == id);
-            if (user == null)
-                return NotFound("User not found.");
-            user.Status = "Inactive";
-            _db.Entry(user).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-            return Ok("User inactivated successfully.");
+            return Ok(new
+            {
+                Message = $"User status changed to {existingUser.Status} successfully.",
+                UserID = existingUser.UserID,
+                NewStatus = existingUser.Status
+            });
         }
     }
 }

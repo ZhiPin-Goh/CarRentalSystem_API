@@ -34,21 +34,48 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
             {
                 if (!ModelState.IsValid)
                 {
-                    return BadRequest(ModelState);
+                    return BadRequest(new
+                    {
+                        error = "Invalid input data.",
+                        Message = "Please ensure all required fields are filled out correctly and the data format is valid."
+                    });
                 }
                 if (string.IsNullOrWhiteSpace(createBanners.Title))
-                    return BadRequest("Title is required.");
+                {
+                    return BadRequest(new
+                    {
+                        error = "Title is required.",
+                        Message = "The Title field is required and cannot be empty or whitespace."
+                    });
+                }
 
                 if (createBanners.StartDate >= createBanners.EndDate)
-                    return BadRequest("Start date must be before end date.");
+                {
+                    return BadRequest(new
+                    {
+                        error = "Invalid date range.",
+                        Message = "Start date must be before end date."
+                    });
+                }
                 if (createBanners.ImageUrl == null || createBanners.ImageUrl.Length == 0)
-                    return BadRequest("Image is required.");
+                {
+                    return BadRequest(new
+                    {
+                        error = "Image is required.",
+                        Message = "An image file must be uploaded for the banner."
+                    });
+                }
 
                 var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
                 var ext = Path.GetExtension(createBanners.ImageUrl.FileName).ToLowerInvariant();
                 if (string.IsNullOrEmpty(ext) || !allowedExtensions.Contains(ext))
                 {
-                    return BadRequest("Invalid file type. Only image files are allowed.");
+                    return BadRequest(new
+                    {
+                        error = "Invalid file type.",
+                        Message = "Only image files with extensions .jpg, .jpeg, .png, or .gif are allowed."
+                    });
+
                 }
                 var cloudName = _config["CloudinarySettings:CloudName"];
                 var apiKey = _config["CloudinarySettings:ApiKey"];
@@ -70,7 +97,11 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
                 }
                 if (uploadFolder == null || string.IsNullOrEmpty(uploadFolder.SecureUrl.AbsoluteUri))
                 {
-                    return StatusCode(500, "Image upload failed.");
+                    return StatusCode(500, new
+                    {
+                        error = "Image upload failed.",
+                        Message = "An error occurred while uploading the image to Cloudinary. Please try again later."
+                    });
                 }
                 string cloudImageUrl = uploadFolder.SecureUrl.AbsoluteUri;
                 _db.Banners.Add(new Banners
@@ -84,11 +115,19 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
                     EndDate = createBanners.EndDate
                 });
                 await _db.SaveChangesAsync();
-                return Ok("Banner created successfully.");
+                return Ok(new
+                {
+                    Message = "Banner created successfully.",
+                    BannerID = _db.Banners.OrderByDescending(b => b.BannersID).FirstOrDefault().BannersID
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"An error occurred while creating the banner: {ex.Message}");
+                return StatusCode(500, new
+                {
+                    error = "An error occurred while creating the banner.",
+                    Message = $"An unexpected error occurred: {ex.Message}"
+                });
             }
         }
         [HttpPost]
@@ -98,14 +137,24 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
             {
                 var banner = await _db.Banners.FirstOrDefaultAsync(b => b.BannersID == updateBanners.ID);
                 if (banner == null)
-                    return NotFound("Banner not found.");
+                {
+                    return NotFound(new
+                    {
+                        error = "Banner not found.",
+                        Message = $"No banner with ID {updateBanners.ID} exists in the database."
+                    });
+                }
                 if (updateBanners.ImageUrl != null)
                 {
                     var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
                     var ext = Path.GetExtension(updateBanners.ImageUrl.FileName).ToLowerInvariant();
                     if (string.IsNullOrEmpty(ext) || !allowedExtensions.Contains(ext))
                     {
-                        return BadRequest("Invalid file type. Only image files are allowed.");
+                        return BadRequest(new
+                        {
+                            error = "Invalid file type.",
+                            Message = "Only image files with extensions .jpg, .jpeg, .png, or .gif are allowed."
+                        });
                     }
                     var cloudName = _config["CloudinarySettings:CloudName"];
                     var apiKey = _config["CloudinarySettings:ApiKey"];
@@ -122,7 +171,11 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
                         var deletionResult = cloudinary.Destroy(deletionParams);
                         if (deletionResult.Result != "ok")
                         {
-                            return StatusCode(500, "Failed to delete the old image from Cloudinary.");
+                            return StatusCode(500, new
+                            {
+                                error = "Failed to delete the image from Cloudinary.",
+                                Message = "An error occurred while deleting the old image from Cloudinary. Please try again later."
+                            });
                         }
                     }
                     var uploadFolder = new ImageUploadResult();
@@ -137,7 +190,11 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
                     }
                     if (uploadFolder == null || string.IsNullOrEmpty(uploadFolder.SecureUrl.AbsoluteUri))
                     {
-                        return StatusCode(500, "Image upload failed.");
+                        return StatusCode(500, new
+                        {
+                            error = "Image upload failed.",
+                            Message = "An error occurred while uploading the image to Cloudinary. Please try again later."
+                        });
                     }
                     banner.ImageURL = uploadFolder.SecureUrl.AbsoluteUri;
                 }
@@ -149,11 +206,19 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
                 banner.Description = string.IsNullOrEmpty(updateBanners.Description) ? updateBanners.Title : updateBanners.Description;
                 banner.TargetURL = updateBanners.TargetUrl;
                 await _db.SaveChangesAsync();
-                return Ok("Banner updated successfully.");
+                return Ok(new
+                {
+                    Message = "Banner updated successfully.",
+                    BannerID = banner.BannersID
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"An error occurred while updating the banner: {ex.Message}");
+                return StatusCode(500, new
+                {
+                    error = "An error occurred while updating the banner.",
+                    Message = $"An unexpected error occurred: {ex.Message}"
+                });
             }
         }
         [HttpDelete("{id}")]
@@ -163,7 +228,13 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
             {
                 var banner = await _db.Banners.FirstOrDefaultAsync(b => b.BannersID == id);
                 if (banner == null)
-                    return NotFound("Banner not found.");
+                {
+                    return NotFound(new
+                    {
+                        error = "Banner not found.",
+                        Message = $"No banner with ID {id} exists in the database."
+                    });
+                }
                 var cloudName = _config["CloudinarySettings:CloudName"];
                 var apiKey = _config["CloudinarySettings:ApiKey"];
                 var apiSecret = _config["CloudinarySettings:ApiSecret"];
@@ -178,17 +249,50 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
                     var deletionResult = cloudinary.Destroy(deletionParams);
                     if (deletionResult.Result != "ok")
                     {
-                        return StatusCode(500, "Failed to delete the image from Cloudinary.");
+                        return StatusCode(500, new
+                        {
+                            error = "Failed to delete the image from Cloudinary.",
+                            Message = "An error occurred while deleting the image from Cloudinary. Please try again later."
+                        });
                     }
                 }
                 _db.Banners.Remove(banner);
                 await _db.SaveChangesAsync();
-                return Ok("Banner deleted successfully.");
+                return Ok(new
+                {
+                    Message = "Banner deleted successfully.",
+                    BannerID = id
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"An error occurred while deleting the banner: {ex.Message}");
+                return StatusCode(500, new
+                {
+                    error = "An error occurred while deleting the banner.",
+                    Message = $"An unexpected error occurred: {ex.Message}"
+                });
             }
+        }
+        [HttpPost("{id}/toggle")]
+        public async Task<IActionResult> ToggleBannerStatus(int id)
+        {
+            var banner = await _db.Banners.FirstOrDefaultAsync(b => b.BannersID == id);
+            if (banner == null)
+            {
+                return NotFound(new
+                {
+                    error = "Banner not found.",
+                    Message = $"No banner with ID {id} exists in the database."
+                });
+            }
+            banner.IsActive = !banner.IsActive;
+            await _db.SaveChangesAsync();
+            return Ok(new
+            {
+                Message = $"Banner {(banner.IsActive ? "activated" : "deactivated")} successfully.",
+                BannerID = id,
+                NewStatus = banner.IsActive ? "Active" : "Inactive"
+            });
         }
     }
 }

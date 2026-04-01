@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
-namespace CarRentalSystem_API.Controllers
+namespace CarRentalSystem_API.Controllers.AuthControllers
 {
     [ApiController]
     [Route("api/[controller]/[action]")]
@@ -28,12 +28,23 @@ namespace CarRentalSystem_API.Controllers
             var vehicles = await _db.Vehicles.ToListAsync();
             return Ok(vehicles);
         }
+        [HttpGet]
+        public async Task<IActionResult> GetAvailableVehicles()
+        {
+            var vehicles = await _db.Vehicles.Where(v => v.Status == "Available").ToListAsync();
+            return Ok(vehicles);
+        }
         [HttpGet("{id}")]
         public async Task<IActionResult> GetVehicleByID(int id)
         {
             var vehicle = await _db.Vehicles.FindAsync(id);
             if (vehicle == null)
-                return NotFound("Vehicle not found");
+                return NotFound(new
+                {
+                    error = "Vehicle Not Found",
+                    message = $"Vehicle with ID {id} not found."
+                });
+
             return Ok(vehicle);
         }
         [HttpPost]
@@ -42,16 +53,31 @@ namespace CarRentalSystem_API.Controllers
             try
             {
                 if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+                    return BadRequest(new
+                    {
+                        error = "Validation Error",
+                        message = "Please ensure all required fields are filled out correctly."
+                    });
+
                 var existingVehicle = await _db.Vehicles.FirstOrDefaultAsync(v => v.LicensePlate == vehicleDTO.LicensePlate);
                 if (existingVehicle != null)
-                    return BadRequest("A vehicle with the same license plate already exists");
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+                    return BadRequest(new
+                    {
+                        error = "Duplicate License Plate",
+                        message = $"A vehicle with license plate {vehicleDTO.LicensePlate} already exists."
+                    });
                 if (vehicleDTO.Year < 1990 || vehicleDTO.Year > DateTime.Now.Year + 1)
-                    return BadRequest("Year must be between 1990 and next year");
+                    return BadRequest(new
+                    {
+                        error = "Invalid Year",
+                        message = $"Year must be between 1990 and {DateTime.Now.Year + 1}."
+                    });
                 if (vehicleDTO.DailyRate <= 0)
-                    return BadRequest("Daily rate must be greater than zero");
+                    return BadRequest(new
+                    {
+                        error = "Invalid Daily Rate",
+                        message = "Daily rate must be greater than zero."
+                    });
 
                 var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
                 var extPrimary = Path.GetExtension(vehicleDTO.PrimaryImage.FileName).ToLowerInvariant();
@@ -59,10 +85,18 @@ namespace CarRentalSystem_API.Controllers
                 {
                     var extAdditional = Path.GetExtension(item.FileName).ToLowerInvariant();
                     if (!allowedExtensions.Contains(extAdditional))
-                        return BadRequest("Only image files are allowed for additional images");
+                        return BadRequest(new
+                        {
+                            error = "Invalid File Type",
+                            message = $"Only image files are allowed for additional images. Invalid file: {item.FileName}"
+                        });
                 }
                 if (!allowedExtensions.Contains(extPrimary))
-                    return BadRequest("Only image files are allowed for primary image");
+                    return BadRequest(new
+                    {
+                        error = "Invalid File Type",
+                        message = "Only image files are allowed for primary image."
+                    });
 
                 var cloudName = _config["CloudinarySettings:CloudName"];
                 var apiKey = _config["CloudinarySettings:ApiKey"];
@@ -83,7 +117,11 @@ namespace CarRentalSystem_API.Controllers
                     };
                     uploadFolderPrimary = cloudinary.Upload(uploadParams);
                     if (uploadFolderPrimary.Error != null)
-                        return StatusCode(500, "Failed to upload primary image: " + uploadFolderPrimary.Error.Message);
+                        return StatusCode(500, new
+                        {
+                            error = "Image Upload Failed",
+                            message = "Failed to upload primary image: " + uploadFolderPrimary.Error.Message
+                        });
                     imageSave.Add(new VehicleImage
                     {
                         ImageURL = uploadFolderPrimary.SecureUrl.AbsoluteUri,
@@ -103,7 +141,11 @@ namespace CarRentalSystem_API.Controllers
                         };
                         uploadFolderAdditional = cloudinary.Upload(uploadParams);
                         if (uploadFolderAdditional.Error != null)
-                            return StatusCode(500, "Failed to upload additional image: " + item.FileName);
+                            return StatusCode(500, new
+                            {
+                                error = "Image Upload Failed",
+                                message = "Failed to upload additional image: " + item.FileName + " - " + uploadFolderAdditional.Error.Message
+                            });
                     }
 
                     imageSave.Add(new VehicleImage
@@ -127,11 +169,19 @@ namespace CarRentalSystem_API.Controllers
                 };
                 _db.Vehicles.Add(vehicle);
                 await _db.SaveChangesAsync();
-                return Ok("Vehicle created successfully");
+                return Ok(new
+                {
+                    Message = "Vehicle created successfully.",
+                    VehicleID = vehicle.VehicleID
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while creating the vehicle: " + ex.Message);
+                return StatusCode(500, new
+                {
+                    error = "Internal Server Error",
+                    message = "An error occurred while creating the vehicle: " + ex.Message
+                });
             }
         }
         [HttpPost]
@@ -141,20 +191,42 @@ namespace CarRentalSystem_API.Controllers
             {
                 var vehicle = await _db.Vehicles.FirstOrDefaultAsync(v => v.VehicleID == updateVehicle.VechicleID);
                 if (vehicle == null)
-                    return NotFound("Vehicle not found");
+                    return NotFound(new
+                    {
+                        error = "Vehicle Not Found",
+                        message = $"Vehicle with ID {updateVehicle.VechicleID} not found."
+                    });
                 if (updateVehicle.DailyRate < 0)
-                    return BadRequest("Daily rate must be greater than or equal to zero");
+                {
+                    return BadRequest(new
+                    {
+                        error = "Invalid Daily Rate",
+                        message = "Daily rate must be greater than or equal to zero."
+                    });
+                }
                 if (updateVehicle.Year < 1990 || updateVehicle.Year > DateTime.Now.Year + 1)
-                    return BadRequest("Year must be between 1990 and next year");
+                    return BadRequest(new
+                    {
+                        error = "Invalid Year",
+                        message = $"Year must be between 1990 and {DateTime.Now.Year + 1}."
+                    });
 
                 _db.Entry(vehicle).CurrentValues.SetValues(updateVehicle);
                 await _db.SaveChangesAsync();
-                return Ok("Vehicle information updated successfully");
+                return Ok(new
+                {
+                    Message = "Vehicle information updated successfully.",
+                    VehicleID = vehicle.VehicleID
+                });
 
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while updating the vehicle: " + ex.Message);
+                return StatusCode(500, new
+                {
+                    error = "Internal Server Error",
+                    message = "An error occurred while updating the vehicle information: " + ex.Message
+                });
             }
         }
         [HttpPost]
@@ -164,7 +236,11 @@ namespace CarRentalSystem_API.Controllers
             {
                 var vehicle = await _db.Vehicles.Include(v => v.VehicleImages).FirstOrDefaultAsync(v => v.VehicleID == updateVehicle.VehicleID);
                 if (vehicle == null)
-                    return NotFound("Vehicle not found");
+                    return NotFound(new
+                    {
+                        error = "Vehicle Not Found",
+                        message = $"Vehicle with ID {updateVehicle.VehicleID} not found."
+                    });
 
                 var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
 
@@ -179,7 +255,11 @@ namespace CarRentalSystem_API.Controllers
                 {
                     var extPrimary = Path.GetExtension(updateVehicle.PrimaryImage.FileName).ToLowerInvariant();
                     if (!allowedExtensions.Contains(extPrimary) || string.IsNullOrEmpty(extPrimary))
-                        return BadRequest("Only image files are allowed for primary image");
+                        return BadRequest(new
+                        {
+                            error = "Invalid File Type",
+                            message = "Only image files are allowed for primary image."
+                        });
 
                     string publicIDPrimary = ExtractPublicURL.ExtractPublicIDFromUrl(updateVehicle.PrimaryImage.FileName);
                     if (!string.IsNullOrEmpty(publicIDPrimary))
@@ -187,7 +267,11 @@ namespace CarRentalSystem_API.Controllers
                         var deletionParams = new DeletionParams(publicIDPrimary);
                         var deletionResult = cloudinary.Destroy(deletionParams);
                         if (deletionResult.Error != null)
-                            return StatusCode(500, "Failed to delete existing primary image: " + deletionResult.Error.Message);
+                            return StatusCode(500, new
+                            {
+                                error = "Image Deletion Failed",
+                                message = "Failed to delete the old primary image from Cloudinary: " + deletionResult.Error.Message
+                            });
                     }
                     var uploadFolderPrimary = new ImageUploadResult();
                     using (var streamprimary = updateVehicle.PrimaryImage.OpenReadStream())
@@ -199,7 +283,11 @@ namespace CarRentalSystem_API.Controllers
                         };
                         uploadFolderPrimary = cloudinary.Upload(uploadParams);
                         if (uploadFolderPrimary.Error != null)
-                            return StatusCode(500, "Failed to upload primary image: " + uploadFolderPrimary.Error.Message);
+                            return StatusCode(500, new
+                            {
+                                error = "Image Upload Failed",
+                                message = "Failed to upload primary image: " + uploadFolderPrimary.Error.Message
+                            });
                     }
                     var existingPrimaryImage = vehicle.VehicleImages.FirstOrDefault(img => img.IsPrimary);
                     if (existingPrimaryImage != null)
@@ -232,7 +320,11 @@ namespace CarRentalSystem_API.Controllers
                             };
                             uploadFolderAdditional = cloudinary.Upload(uploadParams);
                             if (uploadFolderAdditional.Error != null)
-                                return StatusCode(500, "Failed to upload additional image: " + image.FileName + " - " + uploadFolderAdditional.Error.Message);
+                                return StatusCode(500, new
+                                {
+                                    error = "Image Upload Failed",
+                                    message = "Failed to upload additional image: " + image.FileName + " - " + uploadFolderAdditional.Error.Message
+                                });
                         }
                         vehicle.VehicleImages.Add(new VehicleImage
                         {
@@ -242,26 +334,46 @@ namespace CarRentalSystem_API.Controllers
                     }
                 }
                 await _db.SaveChangesAsync();
-                return Ok("Vehicle images updated successfully");
+                return Ok(new
+                {
+                    Message = "Vehicle images updated successfully.",
+                    VehicleID = vehicle.VehicleID
+                });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while updating the vehicle images: " + ex.Message);
+                return StatusCode(500, new
+                {
+                    error = "Internal Server Error",
+                    message = "An error occurred while updating the vehicle images: " + ex.Message
+                });
             }
         }
-        [HttpDelete("{id}")]
+        [HttpDelete("{id}/delete")]
         public async Task<IActionResult> DeleteVehicle(int id)
         {
             var vehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.VehicleID == id);
             if (vehicle == null)
-                return NotFound("Vehicle not found");
+                return NotFound(new
+                {
+                    error = "Vehicle Not Found",
+                    message = $"Vehicle with ID {id} not found."
+                });
 
             if (vehicle.Status != "Available")
-                return BadRequest("Only vehicles with 'Available' status can be deleted");
+                return BadRequest(new
+                {
+                    error = "Invalid Vehicle Status",
+                    message = "Only vehicles with status 'Available' can be deleted."
+                });
 
             var existingBookings = await _db.Bookings.Where(b => b.VehicleID == id).ToListAsync();
             if (existingBookings.Where(x => x.StartDate > DateTime.Now || x.EndDate > DateTime.Now).Count() > 0)
-                return BadRequest("Cannot delete vehicle with active or upcoming bookings");
+                return BadRequest(new
+                {
+                    error = "Active Bookings Exist",
+                    message = "Cannot delete vehicle with active or upcoming bookings."
+                });
 
             var cloudName = _config["CloudinarySettings:CloudName"];
             var apiKey = _config["CloudinarySettings:ApiKey"];
@@ -289,40 +401,49 @@ namespace CarRentalSystem_API.Controllers
             }
             _db.Vehicles.Remove(vehicle);
             await _db.SaveChangesAsync();
-            return Ok("Vehicle deleted successfully");
+            return Ok(new
+            {
+                Message = "Vehicle deleted successfully.",
+                VehicleID = id
+            });
         }
-        [HttpPost("{id}")]
-        public async Task<IActionResult> InAvailableVehicle(int id)
+        [HttpDelete("{id}/toggle-status")]
+        public async Task<IActionResult> ToggleVehicleStatus(int id)
         {
             var vehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.VehicleID == id);
             if (vehicle == null)
-                return NotFound("Vehicle not found");
-            if (vehicle.Status == "Rented")
-                return BadRequest("Cannot mark vehicle as unavailable while it is currently rented");
-            if (vehicle.Status == "Maintenance")
-                return BadRequest("Vehicle is already marked as unavailable for maintenance");
-
-            bool hasActiveBookings = await _db.Bookings.AnyAsync(b => b.VehicleID == id && (b.StartDate > DateTime.Now || b.EndDate > DateTime.Now));
-            if (hasActiveBookings)
-                return BadRequest("Cannot mark vehicle as unavailable while it has active or upcoming bookings");
-
-            vehicle.Status = "Unavailable";
-            await _db.SaveChangesAsync();
-            return Ok("Vehicle marked as unavailable successfully");
-        }
-        [HttpPost("{id}")]
-        public async Task<IActionResult> AvailableVehicle(int id)
-        {
-            var vehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.VehicleID == id);
-            if (vehicle == null)
-                return NotFound("Vehicle not found");
-            if (vehicle.Status == "Rented")
-                return BadRequest("Cannot mark vehicle as available while it is currently rented");
+                return NotFound(new
+                {
+                    error = "Vehicle Not Found",
+                    message = $"Vehicle with ID {id} not found."
+                });
+            if(vehicle.Status != "Available" && vehicle.Status != "Unavailable")
+                return BadRequest(new
+                {
+                    error = "Invalid Vehicle Status",
+                    message = "Vehicle status must be either 'Available' or 'Unavailable'."
+                });
             if (vehicle.Status == "Available")
-                return BadRequest("Vehicle is already marked as available");
-            vehicle.Status = "Available";
+            {
+                var existingBookings = await _db.Bookings.Where(b => b.VehicleID == id).ToListAsync();
+                if (existingBookings.Where(x => x.StartDate > DateTime.Now || x.EndDate > DateTime.Now).Count() > 0)
+                    return BadRequest(new
+                    {
+                        error = "Active Bookings Exist",
+                        message = "Cannot set vehicle to 'Unavailable' with active or upcoming bookings."
+                    });
+                vehicle.Status = "Unavailable";
+            }
+            else
+            {
+                vehicle.Status = "Available";
+            }
             await _db.SaveChangesAsync();
-            return Ok("Vehicle marked as available successfully");
+            return Ok(new
+            {
+                Message = $"Vehicle status toggled successfully. New status: {vehicle.Status}",
+                VehicleID = vehicle.VehicleID
+            });
         }
     }
 }
