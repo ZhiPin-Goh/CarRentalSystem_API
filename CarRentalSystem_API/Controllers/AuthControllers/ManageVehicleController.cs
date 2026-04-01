@@ -407,7 +407,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 VehicleID = id
             });
         }
-        [HttpDelete("{id}/toggle-status")]
+        [HttpPost("{id}/toggle-status")]
         public async Task<IActionResult> ToggleVehicleStatus(int id)
         {
             var vehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.VehicleID == id);
