@@ -17,7 +17,7 @@ builder.Services.AddSwaggerGen(x =>
 {
     x.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "JWT Authentication API",
+        Title = "Car Rental System API",
         Version = "v1",
     });
     x.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -104,6 +104,7 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddHostedService<VehicleStatusUpdateService>();
 builder.Services.AddHostedService<UserStatusDeleteServices>();
 builder.Services.AddHostedService<BannersStatusUpdateServices>();
+builder.Services.AddHostedService<BookingTimeoutServices>();
 
 var app = builder.Build();
 app.UseStaticFiles();

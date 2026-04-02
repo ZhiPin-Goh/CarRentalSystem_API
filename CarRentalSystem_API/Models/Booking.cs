@@ -29,6 +29,7 @@ namespace CarRentalSystem_API.Models
 
         public string Status { get; set; }//
         public bool IsExtended { get; set; }
+        public DateTime? CreatedAt { get; set; }
         public virtual ICollection<Transaction> Transactions { get; set; }
     }
    
