@@ -53,7 +53,8 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
                 Password = encoder.Encode(createUser.Password),
                 Status = "Active",
                 DriverLicenseNumber = null,
-                TelegramID = null
+                TelegramID = null,
+                Role = "User"
             });
             await _db.SaveChangesAsync();
             return Ok(new

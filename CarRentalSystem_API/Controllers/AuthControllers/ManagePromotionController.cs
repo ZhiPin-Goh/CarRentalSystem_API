@@ -39,7 +39,9 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 MaxDiscountAmount = createPromotion.MaxDiscountAmount,
                 StartDate = createPromotion.StartDate,
                 EndDate = createPromotion.EndDate,
-                IsActive = true
+                IsActive = true,
+                PromotionScope = string.IsNullOrEmpty(createPromotion.PromotionScope) ? "All" : createPromotion.PromotionScope,
+                TargetValue = string.IsNullOrEmpty(createPromotion.TargetValue) ? null : createPromotion.TargetValue
             };
             _db.Promotions.Add(promotion);
             await _db.SaveChangesAsync();

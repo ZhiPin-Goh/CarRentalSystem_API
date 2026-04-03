@@ -80,7 +80,8 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 Password = encoder.Encode(createUser.Password),
                 Status = "Active",
                 DriverLicenseNumber = null,
-                TelegramID = null
+                TelegramID = null,
+                Role = "User"
             });
             await _db.SaveChangesAsync();
             return Ok(new
@@ -159,6 +160,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     OTP = otp, // Generate OTP
                     OTPGeneratedAt = DateTime.Now,
                     Status = "Pending",
+                    Role = "User"
                 };
                 _db.Users.Add(newUser);
             }

@@ -30,7 +30,13 @@ namespace CarRentalSystem_API.Models
         public string Status { get; set; }//
         public bool IsExtended { get; set; }
         public DateTime? CreatedAt { get; set; }
+        public string HandoverMethod { get; set; }
+        public string? DeliveryAddress { get; set; }
+        public decimal? DeliveryFee { get; set; }
+        public int? AssignedStaffID { get; set; }
         public virtual ICollection<Transaction> Transactions { get; set; }
+        [ForeignKey("AssignedStaffID")]
+        public virtual User AssignedStaff { get; set; }
     }
    
 }
