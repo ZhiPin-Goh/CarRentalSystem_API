@@ -53,3 +53,5 @@
     Scrypt.NET
 
     Car Rental payment processing: booking > add booking db > payment > booking status update > booking end > transaction record > vehicle status update
+
+    // Next is Manege Dashboard admin panel:

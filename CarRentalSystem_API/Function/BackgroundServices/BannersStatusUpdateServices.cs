@@ -22,7 +22,7 @@ namespace CarRentalSystem_API.Function.BackgroundServices
                     using (var scope = _serviceProvider.CreateScope())
                     {
                         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                        var today = DateTime.UtcNow.Date;
+                        var today = DateTime.Now.Date;
 
                         var bannersToUpdate = await db.Banners
                             .Where(b => b.EndDate < today && b.IsActive == true)

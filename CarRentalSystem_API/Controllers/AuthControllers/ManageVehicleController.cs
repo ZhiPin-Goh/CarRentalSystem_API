@@ -113,7 +113,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     var uploadParams = new ImageUploadParams()
                     {
                         File = new FileDescription(vehicleDTO.PrimaryImage.FileName, streamprimary),
-                        Folder = "Car Rental System/Vehicles"
+                        Folder = "car_rental_system/Vehicles"
                     };
                     uploadFolderPrimary = cloudinary.Upload(uploadParams);
                     if (uploadFolderPrimary.Error != null)
@@ -137,7 +137,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                         var uploadParams = new ImageUploadParams()
                         {
                             File = new FileDescription(item.FileName, streamAdditional),
-                            Folder = "Car Rental System/Vehicles"
+                            Folder = "car_rental_system/Vehicles"
                         };
                         uploadFolderAdditional = cloudinary.Upload(uploadParams);
                         if (uploadFolderAdditional.Error != null)

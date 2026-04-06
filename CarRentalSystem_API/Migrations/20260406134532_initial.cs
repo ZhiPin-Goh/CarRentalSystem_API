@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace CarRentalSystem_API.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -29,6 +29,21 @@ namespace CarRentalSystem_API.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Banners", x => x.BannersID);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "DeliveryAreas",
+                columns: table => new
+                {
+                    AreaID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    AreaName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Fee = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_DeliveryAreas", x => x.AreaID);
                 });
 
             migrationBuilder.CreateTable(
@@ -60,6 +75,8 @@ namespace CarRentalSystem_API.Migrations
                     PromotionCode = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     DiscountPercentage = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     MaxDiscountAmount = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
+                    PromotionScope = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TargetValue = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     StartDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     EndDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false)
@@ -81,9 +98,11 @@ namespace CarRentalSystem_API.Migrations
                     Password = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     DriverLicenseNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    DriverLicenseImage = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     TelegramID = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     OTP = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    OTPGeneratedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                    OTPGeneratedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    Role = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -112,6 +131,31 @@ namespace CarRentalSystem_API.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "TokenActivities",
+                columns: table => new
+                {
+                    ID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Token = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Message = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Role = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Time = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    AllowAccessToken = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    AllowRefreshToken = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UserID = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TokenActivities", x => x.ID);
+                    table.ForeignKey(
+                        name: "FK_TokenActivities_Users_UserID",
+                        column: x => x.UserID,
+                        principalTable: "Users",
+                        principalColumn: "UserID",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Bookings",
                 columns: table => new
                 {
@@ -126,16 +170,32 @@ namespace CarRentalSystem_API.Migrations
                     FinalPaidAmount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     PromotionID = table.Column<int>(type: "int", nullable: true),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    IsExtended = table.Column<bool>(type: "bit", nullable: false)
+                    IsExtended = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    DeliveryAreaID = table.Column<int>(type: "int", nullable: true),
+                    HandoverMethod = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    DeliveryAddress = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    DeliveryFee = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
+                    AssignedStaffID = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Bookings", x => x.BookingID);
                     table.ForeignKey(
+                        name: "FK_Bookings_DeliveryAreas_DeliveryAreaID",
+                        column: x => x.DeliveryAreaID,
+                        principalTable: "DeliveryAreas",
+                        principalColumn: "AreaID");
+                    table.ForeignKey(
                         name: "FK_Bookings_Promotions_PromotionID",
                         column: x => x.PromotionID,
                         principalTable: "Promotions",
                         principalColumn: "PromotionID");
+                    table.ForeignKey(
+                        name: "FK_Bookings_Users_AssignedStaffID",
+                        column: x => x.AssignedStaffID,
+                        principalTable: "Users",
+                        principalColumn: "UserID");
                     table.ForeignKey(
                         name: "FK_Bookings_Users_UserID",
                         column: x => x.UserID,
@@ -197,6 +257,44 @@ namespace CarRentalSystem_API.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "HandoverReports",
+                columns: table => new
+                {
+                    ReportID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    BookingID = table.Column<int>(type: "int", nullable: false),
+                    ReportType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    StaffID = table.Column<int>(type: "int", nullable: false),
+                    Mileage = table.Column<int>(type: "int", nullable: false),
+                    FuelLevel = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    VehicleImage1 = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    VehicleImage2 = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Remarks = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    HandoverTime = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UserID = table.Column<int>(type: "int", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_HandoverReports", x => x.ReportID);
+                    table.ForeignKey(
+                        name: "FK_HandoverReports_Bookings_BookingID",
+                        column: x => x.BookingID,
+                        principalTable: "Bookings",
+                        principalColumn: "BookingID",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_HandoverReports_Users_StaffID",
+                        column: x => x.StaffID,
+                        principalTable: "Users",
+                        principalColumn: "UserID");
+                    table.ForeignKey(
+                        name: "FK_HandoverReports_Users_UserID",
+                        column: x => x.UserID,
+                        principalTable: "Users",
+                        principalColumn: "UserID");
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Transactions",
                 columns: table => new
                 {
@@ -222,6 +320,16 @@ namespace CarRentalSystem_API.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Bookings_AssignedStaffID",
+                table: "Bookings",
+                column: "AssignedStaffID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Bookings_DeliveryAreaID",
+                table: "Bookings",
+                column: "DeliveryAreaID");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Bookings_PromotionID",
                 table: "Bookings",
                 column: "PromotionID");
@@ -237,9 +345,29 @@ namespace CarRentalSystem_API.Migrations
                 column: "VehicleID");
 
             migrationBuilder.CreateIndex(
+                name: "IX_HandoverReports_BookingID",
+                table: "HandoverReports",
+                column: "BookingID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_HandoverReports_StaffID",
+                table: "HandoverReports",
+                column: "StaffID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_HandoverReports_UserID",
+                table: "HandoverReports",
+                column: "UserID");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_MaintenanceRecords_VehicleID",
                 table: "MaintenanceRecords",
                 column: "VehicleID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TokenActivities_UserID",
+                table: "TokenActivities",
+                column: "UserID");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Transactions_BookingID",
@@ -259,10 +387,16 @@ namespace CarRentalSystem_API.Migrations
                 name: "Banners");
 
             migrationBuilder.DropTable(
+                name: "HandoverReports");
+
+            migrationBuilder.DropTable(
                 name: "MaintenanceRecords");
 
             migrationBuilder.DropTable(
                 name: "News");
+
+            migrationBuilder.DropTable(
+                name: "TokenActivities");
 
             migrationBuilder.DropTable(
                 name: "Transactions");
@@ -272,6 +406,9 @@ namespace CarRentalSystem_API.Migrations
 
             migrationBuilder.DropTable(
                 name: "Bookings");
+
+            migrationBuilder.DropTable(
+                name: "DeliveryAreas");
 
             migrationBuilder.DropTable(
                 name: "Promotions");

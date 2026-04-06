@@ -70,8 +70,20 @@ namespace CarRentalSystem_API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("BookingID"));
 
+                    b.Property<int?>("AssignedStaffID")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("DeliveryAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("DeliveryAreaID")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("DeliveryFee")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal>("DiscountAmount")
                         .HasColumnType("decimal(18,2)");
@@ -81,6 +93,10 @@ namespace CarRentalSystem_API.Migrations
 
                     b.Property<decimal>("FinalPaidAmount")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("HandoverMethod")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsExtended")
                         .HasColumnType("bit");
@@ -106,6 +122,10 @@ namespace CarRentalSystem_API.Migrations
 
                     b.HasKey("BookingID");
 
+                    b.HasIndex("AssignedStaffID");
+
+                    b.HasIndex("DeliveryAreaID");
+
                     b.HasIndex("PromotionID");
 
                     b.HasIndex("UserID");
@@ -113,6 +133,80 @@ namespace CarRentalSystem_API.Migrations
                     b.HasIndex("VehicleID");
 
                     b.ToTable("Bookings");
+                });
+
+            modelBuilder.Entity("CarRentalSystem_API.Models.DeliveryArea", b =>
+                {
+                    b.Property<int>("AreaID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AreaID"));
+
+                    b.Property<string>("AreaName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("Fee")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.HasKey("AreaID");
+
+                    b.ToTable("DeliveryAreas");
+                });
+
+            modelBuilder.Entity("CarRentalSystem_API.Models.HandoverReport", b =>
+                {
+                    b.Property<int>("ReportID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ReportID"));
+
+                    b.Property<int>("BookingID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FuelLevel")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("HandoverTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Mileage")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Remarks")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReportType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("StaffID")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("UserID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("VehicleImage1")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("VehicleImage2")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("ReportID");
+
+                    b.HasIndex("BookingID");
+
+                    b.HasIndex("StaffID");
+
+                    b.HasIndex("UserID");
+
+                    b.ToTable("HandoverReports");
                 });
 
             modelBuilder.Entity("CarRentalSystem_API.Models.MaintenanceRecord", b =>
@@ -213,8 +307,15 @@ namespace CarRentalSystem_API.Migrations
                     b.Property<string>("PromotionCode")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PromotionScope")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("TargetValue")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("PromotionID");
 
@@ -310,6 +411,9 @@ namespace CarRentalSystem_API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserID"));
 
+                    b.Property<string>("DriverLicenseImage")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("DriverLicenseNumber")
                         .HasColumnType("nvarchar(max)");
 
@@ -329,6 +433,9 @@ namespace CarRentalSystem_API.Migrations
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Role")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Status")
@@ -423,6 +530,14 @@ namespace CarRentalSystem_API.Migrations
 
             modelBuilder.Entity("CarRentalSystem_API.Models.Booking", b =>
                 {
+                    b.HasOne("CarRentalSystem_API.Models.User", "AssignedStaff")
+                        .WithMany("DeliveryTasks")
+                        .HasForeignKey("AssignedStaffID");
+
+                    b.HasOne("CarRentalSystem_API.Models.DeliveryArea", "DeliveryArea")
+                        .WithMany("Bookings")
+                        .HasForeignKey("DeliveryAreaID");
+
                     b.HasOne("CarRentalSystem_API.Models.Promotion", "Promotion")
                         .WithMany()
                         .HasForeignKey("PromotionID");
@@ -439,11 +554,38 @@ namespace CarRentalSystem_API.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("AssignedStaff");
+
+                    b.Navigation("DeliveryArea");
+
                     b.Navigation("Promotion");
 
                     b.Navigation("User");
 
                     b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("CarRentalSystem_API.Models.HandoverReport", b =>
+                {
+                    b.HasOne("CarRentalSystem_API.Models.Booking", "Booking")
+                        .WithMany("HandoverReports")
+                        .HasForeignKey("BookingID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CarRentalSystem_API.Models.User", "Staff")
+                        .WithMany()
+                        .HasForeignKey("StaffID")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("CarRentalSystem_API.Models.User", null)
+                        .WithMany("HandoverReports")
+                        .HasForeignKey("UserID");
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("Staff");
                 });
 
             modelBuilder.Entity("CarRentalSystem_API.Models.MaintenanceRecord", b =>
@@ -492,12 +634,23 @@ namespace CarRentalSystem_API.Migrations
 
             modelBuilder.Entity("CarRentalSystem_API.Models.Booking", b =>
                 {
+                    b.Navigation("HandoverReports");
+
                     b.Navigation("Transactions");
+                });
+
+            modelBuilder.Entity("CarRentalSystem_API.Models.DeliveryArea", b =>
+                {
+                    b.Navigation("Bookings");
                 });
 
             modelBuilder.Entity("CarRentalSystem_API.Models.User", b =>
                 {
                     b.Navigation("Bookings");
+
+                    b.Navigation("DeliveryTasks");
+
+                    b.Navigation("HandoverReports");
 
                     b.Navigation("TokenActivities");
                 });

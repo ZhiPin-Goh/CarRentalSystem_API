@@ -1,4 +1,6 @@
-﻿namespace CarRentalSystem_API.Models
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace CarRentalSystem_API.Models
 {
     public class User
     {
@@ -9,12 +11,16 @@
         public string Password { get; set; }
         public string Status { get; set; }//
         public string? DriverLicenseNumber { get; set; }
+        public string? DriverLicenseImage { get; set; }
         public string? TelegramID { get; set; }
         public string? OTP { get; set; }
         public DateTime? OTPGeneratedAt { get; set; }
         public string? Role { get; set; }   
         public virtual ICollection<Booking> Bookings { get; set; }
+        [InverseProperty("AssignedStaff")]
+        public virtual ICollection<Booking> DeliveryTasks { get; set; }
         public virtual ICollection<TokenActivity> TokenActivities { get; set; }
+        public virtual ICollection<HandoverReport> HandoverReports { get; set; }
     }
   
 }

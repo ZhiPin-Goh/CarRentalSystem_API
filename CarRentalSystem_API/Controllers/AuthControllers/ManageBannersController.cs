@@ -106,7 +106,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     var uploadParams = new ImageUploadParams()
                     {
                         File = new FileDescription(createBanners.ImageUrl.FileName, stream),
-                        Folder = "Car Rental System/Banners"
+                        Folder = "car_rental_system/Banners"
                     };
                     uploadFolder = cloudinary.Upload(uploadParams);
                 }
@@ -199,7 +199,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                         var uploadParams = new ImageUploadParams()
                         {
                             File = new FileDescription(updateBanners.ImageUrl.FileName, stream),
-                            Folder = "Car Rental System/Banners"
+                            Folder = "car_rental_system/Banners"
                         };
                         uploadFolder = cloudinary.Upload(uploadParams);
                     }
