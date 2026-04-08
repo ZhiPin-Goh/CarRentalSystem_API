@@ -88,13 +88,19 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     error = "Invalid Password",
                     Message = "The password you entered is incorrect. Please try again with the correct password."
                 });
-            if(staff.Role != "Staff")
+            if (staff.Role != "Staff")
                 return BadRequest(new
                 {
                     error = "Unauthorized Access",
                     Message = "You do not have permission to access this resource. Please log in with a staff account."
                 });
-            
+            if (staff.Status != "Active")
+                return BadRequest(new
+                {
+                    error = "Account Inactive",
+                    Message = "Your account is currently inactive. Please contact the administrator for assistance."
+                });
+
             var tokenhandler = new JwtSecurityTokenHandler();
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(_config["Jwt:Key"]);
@@ -141,8 +147,9 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
         public async Task<IActionResult> StaffLogout()
         {
             int staffID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-            if (staffID == 0) 
-                return BadRequest(new {
+            if (staffID == 0)
+                return BadRequest(new
+                {
                     error = "Invalid User",
                     Message = "Unable to identify the user. Please ensure you are logged in and try again."
                 });
@@ -161,6 +168,26 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             {
                 Message = "Logout Successful",
                 Details = "Your session has been successfully terminated. All active tokens have been invalidated. Please log in again to access your account."
+            });
+        }
+        [HttpPost("{staffid}")]
+        public async Task<IActionResult> StaffDowngrade(int staffid)
+        {
+            var staff = await _db.Users.FindAsync(staffid);
+            if (staff == null)
+                return NotFound(new
+                {
+                    error = "User Not Found",
+                    Message = "No user found with the provided ID. Please check the staff ID and try again."
+                });
+            staff.Status = "Deactivated";
+            staff.Email = $"deactivated_{staff.UserID}_{staff.Email}";
+            staff.PhoneNumber = $"000-00000000";
+            await _db.SaveChangesAsync();
+            return Ok(new
+            {
+                Message = "Staff Deactivated Successfully",
+                Details = $"The staff member with ID {staff.UserID}"
             });
         }
     }

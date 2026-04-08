@@ -11,8 +11,8 @@ namespace CarRentalSystem_API.Models
         public DateTime Time { get; set; }
         public string AllowAccessToken { get; set; }  
         public string AllowRefreshToken { get; set; }
-        public int UserID { get; set; }
+        public int? UserID { get; set; }
         [ForeignKey("UserID")]
-        public virtual User User { get; set; }
+        public virtual User? User { get; set; }
     }
 }

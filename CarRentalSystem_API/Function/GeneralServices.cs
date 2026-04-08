@@ -35,7 +35,7 @@ namespace CarRentalSystem_API.Function
                     Credentials = new System.Net.NetworkCredential(senderEmail, "Goh1227@@@")
                 };
 
-                // 5. 发送邮件
+                // 发送邮件
                 await client.SendMailAsync(msg);
             }
             catch (Exception ex)

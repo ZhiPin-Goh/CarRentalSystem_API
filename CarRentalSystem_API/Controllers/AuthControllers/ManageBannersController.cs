@@ -21,7 +21,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
         }
         // This is used to get all the banners for the home page, it will return only the active banners that are within the start and end date range
         [HttpGet]
-        public async Task<IActionResult> GetBanners()
+        public async Task<IActionResult> GetActiveBanners()
         {
             var banners = await _db.Banners
             .Where(x => x.StartDate <= DateTime.UtcNow && x.EndDate >= DateTime.UtcNow && x.IsActive)
@@ -236,18 +236,18 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteBanner(int id)
+        [HttpDelete("{bannnersid}")]
+        public async Task<IActionResult> DeleteBanner(int bannnersid)
         {
             try
             {
-                var banner = await _db.Banners.FirstOrDefaultAsync(b => b.BannersID == id);
+                var banner = await _db.Banners.FirstOrDefaultAsync(b => b.BannersID == bannnersid);
                 if (banner == null)
                 {
                     return NotFound(new
                     {
                         error = "Banner not found.",
-                        Message = $"No banner with ID {id} exists in the database."
+                        Message = $"No banner with ID {bannnersid} exists in the database."
                     });
                 }
                 var cloudName = _config["CloudinarySettings:CloudName"];
@@ -276,7 +276,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return Ok(new
                 {
                     Message = "Banner deleted successfully.",
-                    BannerID = id
+                    BannerID = bannnersid
                 });
             }
             catch (Exception ex)
@@ -288,16 +288,16 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
-        [HttpPost("{id}/toggle")]
-        public async Task<IActionResult> ToggleBannerStatus(int id)
+        [HttpPost("{banners}/toggle")]
+        public async Task<IActionResult> ToggleBannerStatus(int banners)
         {
-            var banner = await _db.Banners.FirstOrDefaultAsync(b => b.BannersID == id);
+            var banner = await _db.Banners.FirstOrDefaultAsync(b => b.BannersID == banners);
             if (banner == null)
             {
                 return NotFound(new
                 {
                     error = "Banner not found.",
-                    Message = $"No banner with ID {id} exists in the database."
+                    Message = $"No banner with ID {banners} exists in the database."
                 });
             }
             banner.IsActive = !banner.IsActive;
@@ -305,7 +305,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             return Ok(new
             {
                 Message = $"Banner {(banner.IsActive ? "activated" : "deactivated")} successfully.",
-                BannerID = id,
+                BannerID = banners,
                 NewStatus = banner.IsActive ? "Active" : "Inactive"
             });
         }

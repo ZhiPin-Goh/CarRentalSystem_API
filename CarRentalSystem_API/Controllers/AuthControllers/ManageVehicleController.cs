@@ -29,24 +29,59 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             return Ok(vehicles);
         }
         [HttpGet]
-        public async Task<IActionResult> GetAvailableVehicles()
+        public async Task<IActionResult> GetHomePageVehicles()
         {
-            var vehicles = await _db.Vehicles.Where(v => v.Status == "Available").ToListAsync();
-            return Ok(vehicles);
-        }
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetVehicleByID(int id)
-        {
-            var vehicle = await _db.Vehicles.FindAsync(id);
-            if (vehicle == null)
-                return NotFound(new
+            var vehicles = await _db.Vehicles
+                .Where(v => v.Status == "Available" || v.Status == "Rented")
+                .Take(6)
+                .Select(v => new
                 {
-                    error = "Vehicle Not Found",
-                    message = $"Vehicle with ID {id} not found."
-                });
-
-            return Ok(vehicle);
+                    v.VehicleID,
+                    v.Brand,
+                    v.Model,
+                    v.Type,
+                    v.DailyRate,
+                    IsAvaliableNow = v.Status == "Available",
+                })
+                .ToListAsync();
+            var activePromtions = await _db.Promotions
+                .Where(p => p.StartDate <= DateTime.Now && p.EndDate >= DateTime.Now)
+                .Select(p => new
+                {
+                    p.PromotionID,
+                    p.DiscountPercentage,
+                })
+                .ToListAsync();
+            return Ok(new
+            {
+                Vehicles = vehicles,
+                Promotions = activePromtions
+            });
         }
+        [HttpPost]
+        public async Task<IActionResult> SearchVehicle([FromBody] SearchVechileDTO searchVechile)
+        {
+            if (searchVechile.StartDate >= searchVechile.EndDate)
+                return BadRequest(new
+                {
+                    error = "Invalid Date Range",
+                    message = "Start date must be earlier than end date."
+                });
+            var bookedVehicleIds = await _db.Bookings
+               .Where(b => (b.Status == "Pending" || b.Status == "Confirmed" || b.Status == "InProgress") &&
+                    b.StartDate < searchVechile.EndDate &&
+                    b.EndDate > searchVechile.StartDate)
+               .Select(b => b.VehicleID)
+               .Distinct()
+               .ToListAsync();
+
+            var availableVehicles = await _db.Vehicles
+                .Where(v => !bookedVehicleIds.Contains(v.VehicleID))
+                .Where(v => v.Status == "Available")
+                .ToListAsync();
+            return Ok(availableVehicles);
+        }
+
         [HttpPost]
         public async Task<IActionResult> CreateVehicle([FromForm] CreateVehicleDTO vehicleDTO)
         {
@@ -417,7 +452,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     error = "Vehicle Not Found",
                     message = $"Vehicle with ID {id} not found."
                 });
-            if(vehicle.Status != "Available" && vehicle.Status != "Unavailable")
+            if (vehicle.Status != "Available" && vehicle.Status != "Unavailable")
                 return BadRequest(new
                 {
                     error = "Invalid Vehicle Status",

@@ -55,3 +55,10 @@
     Car Rental payment processing: booking > add booking db > payment > booking status update > booking end > transaction record > vehicle status update
 
     // Next is Manege Dashboard admin panel:
+
+Done Check controller:
+Banners - Full
+Operations - Full
+Promtions - Full
+news - Full
+Delivery area - Full

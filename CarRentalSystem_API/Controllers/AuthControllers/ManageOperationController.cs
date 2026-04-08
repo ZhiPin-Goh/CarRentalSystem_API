@@ -42,14 +42,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     r.HandoverTime
                 })
                 .ToListAsync();
-            if (report == null)
-            {
-                return NotFound(new
-                {
-                    error = "No handover reports found.",
-                    Message = "No Reports is found in the system."
-                });
-            }
+
             return Ok(report);
         }
         [HttpPost]
@@ -172,21 +165,92 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 await transaction.DisposeAsync();
             }
         }
+        [HttpPost("{bookingid}")]
+        public async Task<IActionResult> CompletedBooking(int bookingid)
+        {
+            var booking = await _db.Bookings
+                .Include(b => b.Vehicle)
+                .FirstOrDefaultAsync(b => b.BookingID == bookingid);
+            if (booking == null)
+                return BadRequest(new
+                {
+                    error = "Booking not found.",
+                    Message = $"No booking found with ID {bookingid}."
+                });
+
+            if (booking.Status == "Completed")
+                return BadRequest(new
+                {
+                    error = "Booking already completed.",
+                    Message = $"Booking ID {bookingid} is already marked as completed."
+                });
+
+            var reportHandover = await _db.HandoverReports
+                .AnyAsync(r => r.BookingID == bookingid && r.ReportType == "return");
+            if (!reportHandover)
+                return BadRequest(new
+                {
+                    error = "Return report missing.",
+                    Message = $"No return handover report found for booking ID {bookingid}. Please submit the return report before marking the booking as completed."
+                });
+
+            booking.Status = "Completed";
+            if (booking.Vehicle != null)
+            {
+                booking.Vehicle.Status = "Available";
+            }
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                Message = $"Booking ID {bookingid} marked as completed successfully."
+            });
+        }
         // Handover Report API finished
 
         ///<summary>
         /// This is booking operation API.
         ///</summary>
-
+        [HttpGet]
+        public async Task<IActionResult> GetUnassignedBookings()
+        {
+            var bookings = await _db.Bookings
+                .Where(b => b.AssignedStaffID == null && b.Status == "Confirmed")
+                .Include(b => b.Vehicle)
+                .Include(b => b.User)
+                .Include(b => b.DeliveryArea)
+                .OrderByDescending(b => b.StartDate)
+                .Select(b => new
+                {
+                    b.BookingID,
+                    VehicleModel = b.Vehicle.Model,
+                    VehicleLicensePlate = b.Vehicle.LicensePlate,
+                    UserName = b.User.UserName,
+                    PhoneNumber = b.User.PhoneNumber,
+                    b.StartDate,
+                    b.EndDate,
+                    b.HandoverMethod,
+                    DeliveryArea = b.DeliveryArea != null ? b.DeliveryArea.AreaName : "N/A",
+                    b.DeliveryAddress
+                }).ToListAsync();
+            return Ok(bookings);
+        }
         [HttpPost]
         public async Task<IActionResult> AssignStaff([FromBody] AssignStaffDTO assign)
         {
-            var booking = await _db.Bookings.FirstOrDefaultAsync(b => b.BookingID == assign.BookingID && b.HandoverMethod == "Self-Service");
+            var booking = await _db.Bookings.FirstOrDefaultAsync(b => b.BookingID == assign.BookingID);
             if (booking == null)
                 return NotFound(new
                 {
                     error = "Booking not found.",
                     Message = $"No booking found with ID {assign.BookingID}."
+                });
+            if (booking.Status != "Confirmed" && booking.Status != "Pending")
+                return BadRequest(new
+                {
+                    error = "Invalid booking status.",
+                    Message = $"Booking ID {assign.BookingID} is not in a valid state for staff assignment."
                 });
             var staff = await _db.Users.FindAsync(assign.StaffID);
             if (staff == null || staff.Role != "Staff")
@@ -213,18 +277,24 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     Message = "Please log in to view assigned bookings."
                 });
             var bookings = await _db.Bookings
-                .Select(x => new
+                .Where(b => b.AssignedStaffID == staffID && (b.Status == "InProgress" || b.Status == "Confirmed"))
+                .Include(b => b.Vehicle)
+                .Include(b => b.User)
+                .Include(b => b.DeliveryArea)
+                .OrderByDescending(b => b.StartDate)
+                .Select(b => new
                 {
-                    x.BookingID,
-                    x.VehicleID,
-                    VehicleModel = x.Vehicle.Model,
-                    x.User.UserName,
-                    x.DeliveryArea,
-                    x.DeliveryAddress,
-                    x.HandoverMethod,
-                    x.StartDate,
-                    x.Status,
-                    x.AssignedStaffID
+                    b.BookingID,
+                    VehicleModel = b.Vehicle.Model,
+                    VehicleLicensePlate = b.Vehicle.LicensePlate,
+                    UserName = b.User.UserName,
+                    PhoneNumber = b.User.PhoneNumber,
+                    b.StartDate,
+                    b.EndDate,
+                    b.HandoverMethod,
+                    DeliveryArea = b.DeliveryArea != null ? b.DeliveryArea.AreaName : "N/A",
+                    DeliveryAddress = b.DeliveryAddress != null ? b.DeliveryAddress : "N/A",
+                    StaffName = b.AssignedStaff.UserName,
                 }).ToListAsync();
             return Ok(bookings);
         }

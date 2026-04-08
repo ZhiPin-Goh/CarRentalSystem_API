@@ -39,7 +39,7 @@ namespace CarRentalSystem_API.Function.BackgroundServices
                 {
                     _logger.LogError(ex, "An error occurred while deleting pending users.");
                 }
-                await Task.Delay(TimeSpan.FromMinutes(1), stoppigToken);
+                await Task.Delay(TimeSpan.FromHours(1), stoppigToken);
             }
         }
     }

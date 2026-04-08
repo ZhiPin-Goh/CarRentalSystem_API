@@ -73,7 +73,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 .FirstOrDefaultAsync(a => a.AreaName.ToLower() == createArea.AreaName.ToLower());
             if (existingArea != null)
             {
-                return Conflict(new
+                return BadRequest(new
                 {
                     error = "Area already exists.",
                     Message = $"A delivery area with the name '{createArea.AreaName}' already exists."

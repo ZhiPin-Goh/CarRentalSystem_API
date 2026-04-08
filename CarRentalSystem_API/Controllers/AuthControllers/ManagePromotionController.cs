@@ -20,22 +20,54 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             var promotions = await _db.Promotions.ToListAsync();
             return Ok(promotions);
         }
-
+        [HttpGet]
+        public async Task<IActionResult> GetActivePromtions()
+        {
+            var activePromotions = await _db.Promotions
+                .Where(p => p.IsActive && p.StartDate <= DateTime.Now && p.EndDate >= DateTime.Now)
+                .ToListAsync();
+           
+            return Ok(activePromotions);
+        }
         [HttpPost]
         public async Task<IActionResult> CreatePromotion([FromBody] CreatePromotionDTO createPromotion)
         {
             var existingPromotion = await _db.Promotions.AnyAsync(p => p.PromotionCode == createPromotion.PromotionCode);
             if (existingPromotion)
-                return BadRequest("Promotion code already exists.");
+                return BadRequest(new
+                {
+                    error = "Duplicate Promotion Code",
+                    Message = "Promotion code already exists. Please choose a unique promotion code."
+                });
             if (createPromotion.StartDate >= createPromotion.EndDate)
-                return BadRequest("Start date must be before end date.");
+                return BadRequest(new
+                {
+                    error = "Invalid Date Range",
+                    Message = "Start date must be before end date."
+                });
             if (createPromotion.DiscountPercentage <= 0 || createPromotion.DiscountPercentage > 100)
-                return BadRequest("Discount percentage must be between 0 and 100.");
+                return BadRequest(new
+                {
+                    error = "Invalid Discount Percentage",
+                    Message = "Discount percentage must be between 0 and 100."
+                });
+            if(createPromotion.MaxDiscountAmount != null)
+            {
+                if (createPromotion.MaxDiscountAmount <= 0)
+                    return BadRequest(new
+                    {
+                        error = "Invalid Max Discount Amount",
+                        Message = "Max discount amount must be greater than 0."
+                    });
+            }
+            else 
+                createPromotion.MaxDiscountAmount = null;
+
             var promotion = new Promotion
             {
                 Name = createPromotion.Name,
                 PromotionCode = createPromotion.PromotionCode,
-                DiscountPercentage = createPromotion.DiscountPercentage,
+                DiscountPercentage = createPromotion.DiscountPercentage, // 0.15m for 15% discount < This is simple
                 MaxDiscountAmount = createPromotion.MaxDiscountAmount,
                 StartDate = createPromotion.StartDate,
                 EndDate = createPromotion.EndDate,
@@ -56,12 +88,31 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
         {
             var existingPromotion = await _db.Promotions.FirstOrDefaultAsync(p => p.PromotionID == updatePromotion.PromotionID);
             if (existingPromotion == null)
-                return NotFound($"Promotion with ID {updatePromotion.PromotionID} not found.");
+                return NotFound(new
+                {
+                    error = "Promotion Not Found",
+                    Message = $"Promotion with ID {updatePromotion.PromotionID} not found."
+                });
             if (updatePromotion.StartDate >= updatePromotion.EndDate)
-                return BadRequest("Start date must be before end date.");
+                return BadRequest(new
+                {
+                    error = "Invalid Date Range",
+                    Message = "Start date must be before end date."
+                });
             if (updatePromotion.DiscountPercentage <= 0 || updatePromotion.DiscountPercentage > 100)
-                return BadRequest("Discount percentage must be between 0 and 100.");
-
+                return BadRequest(new
+                {
+                    error = "Invalid Discount Percentage",
+                    Message = "Discount percentage must be between 0 and 100."
+                });
+            if (updatePromotion.MaxDiscountAmount != null)
+                if (updatePromotion.MaxDiscountAmount <= 0)
+                    return BadRequest(new
+                    {
+                        error = "Invalid Max Discount Amount",
+                        Message = "Max discount amount must be greater than 0."
+                    });
+                
             _db.Entry(existingPromotion).CurrentValues.SetValues(updatePromotion);
             await _db.SaveChangesAsync();
             return Ok(new

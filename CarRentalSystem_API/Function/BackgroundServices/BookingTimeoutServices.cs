@@ -36,7 +36,7 @@ namespace CarRentalSystem_API.Function.BackgroundServices
                             {
                                 _logger.LogInformation($"Cancelled {expiredBookings.Count} expired bookings.");
                             }
-                            await db.SaveChangesAsync(stoppingToken);
+                            await db.SaveChangesAsync();
                             _logger.LogInformation("Booking timeout check completed.");
                         }
                     }

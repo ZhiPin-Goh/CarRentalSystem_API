@@ -13,6 +13,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
+
+// This is Swagger configuration with JWT authentication
 builder.Services.AddSwaggerGen(x =>
 {
     x.SwaggerDoc("v1", new OpenApiInfo
@@ -45,6 +47,7 @@ builder.Services.AddSwaggerGen(x =>
     });
 });
 
+// This is JWT authentication configuration
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(option =>
 {
     option.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
@@ -88,10 +91,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
             return context.Response.WriteAsJsonAsync(errorResponse);
         }
     };
-}); 
+});
+// Add DbContext with SQL Server connection string from appsettings.json
 builder.Services.AddDbContext<AppDbContext>
    (options => options
   .UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Configure Kestrel and IIS to allow large file uploads (up to 1 GB) (This is image set up)
 builder.Services.Configure<IISServerOptions>(options =>
 {
     options.MaxRequestBodyBufferSize = 1073741824; // 1 GB
@@ -101,10 +107,13 @@ builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestBodySize = 1073741824; // 1 GB
 });
 
+// This is background services (automation tasks)
 builder.Services.AddHostedService<VehicleStatusUpdateService>();
 builder.Services.AddHostedService<UserStatusDeleteServices>();
 builder.Services.AddHostedService<BannersStatusUpdateServices>();
 builder.Services.AddHostedService<BookingTimeoutServices>();
+builder.Services.AddHostedService<UserStatusDeleteServices>();
+builder.Services.AddHostedService<PromotionStatusUpdateServices>();
 
 var app = builder.Build();
 app.UseStaticFiles();
@@ -115,6 +124,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// This is global exception handling middleware (jwt)
 app.UseAuthorization();
 
 app.MapControllers();

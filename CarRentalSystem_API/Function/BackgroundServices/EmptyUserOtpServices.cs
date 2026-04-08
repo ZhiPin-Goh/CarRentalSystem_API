@@ -42,6 +42,7 @@ namespace CarRentalSystem_API.Function.BackgroundServices
                 {
                     _logger.LogError(ex, "An error occurred while emptying user OTPs.");
                 }
+                await Task.Delay(TimeSpan.FromDays(1), stoppingToken);
             }
         }
     }

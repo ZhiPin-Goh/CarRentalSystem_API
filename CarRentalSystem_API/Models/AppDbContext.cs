@@ -19,6 +19,7 @@ namespace CarRentalSystem_API.Models
         public DbSet<TokenActivity> TokenActivities { get; set; }
         public DbSet<HandoverReport> HandoverReports { get; set; }
         public DbSet<DeliveryArea> DeliveryAreas { get; set; }
+        public DbSet<DailyFinancialSummary> DailyFinancialSummaries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

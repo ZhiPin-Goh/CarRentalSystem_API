@@ -32,7 +32,8 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
         [HttpGet]
         public async Task<IActionResult> GetAllUser()
         {
-            return Ok(await _db.Users.ToListAsync());
+            var users = await _db.Users.Where(u => u.Role == "User").ToListAsync();
+            return Ok(users);
         }
         [HttpGet]
         public async Task<IActionResult> UserProfile()
@@ -43,7 +44,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid User ID",
-                    message = "User ID is missing or invalid."
+                    Message = "User ID is missing or invalid."
                 });
             }
             var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == userID);
@@ -51,21 +52,12 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             {
                 return NotFound(new
                 {
-                    error = "User Not Found",
-                    message = "User not found."
+                    error = "User Not Found.",
+                    Message = $"User with ID {userID} not found."
                 });
+              
             }
-            return Ok(new
-            {
-                UserID = user.UserID,
-                UserName = user.UserName,
-                Email = user.Email,
-                PhoneNumber = user.PhoneNumber,
-                DriverLicenseNumber = user.DriverLicenseNumber,
-                TelegramID = user.TelegramID,
-                Status = user.Status,
-                Role = user.Role
-            });
+            return Ok(user);
         }
         // This is create user not authentication the email and password, just create user for admin
         [HttpPost]
@@ -76,7 +68,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid Phone Number Format",
-                    message = "Invalid phone number format. Format: 01X-XXXXXXX"
+                    Message = "Invalid phone number format. Format: 01X-XXXXXXX"
                 });
             }
             if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.Password, passwordPattern))
@@ -84,7 +76,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid Password Format",
-                    message = "Password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
+                    Message = "Password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
                 });
             }
 
@@ -93,7 +85,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid Email Format",
-                    message = "Invalid email format."
+                    Message = "Invalid email format."
                 });
             }
             var existingUser = await _db.Users.AnyAsync(u => u.Email == createUser.Email && u.PhoneNumber == createUser.PhoneNumber);
@@ -102,18 +94,16 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "User Already Exists",
-                    message = "A user with the same email and phone number already exists."
+                    Message = "A user with the same email and phone number already exists."
                 });
             }
-            _db.Users.Add(new User
+            await _db.Users.AddAsync(new User
             {
                 UserName = createUser.UserName,
                 Email = createUser.Email,
                 PhoneNumber = createUser.PhoneNumber,
                 Password = encoder.Encode(createUser.Password),
                 Status = "Active",
-                DriverLicenseNumber = null,
-                TelegramID = null,
                 Role = "User"
             });
             await _db.SaveChangesAsync();
@@ -124,7 +114,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             });
         }
         [HttpPost]
-        public async Task<IActionResult> SignUpUser([FromBody] CreateUserDTO createUser)
+        public async Task<IActionResult> SignUpUser([FromBody] SignUpDTO createUser)
         {
 
             if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.PhoneNumber.ToString(), phonePattern))
@@ -132,7 +122,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid Phone Number Format",
-                    message = "Invalid phone number format. Format: 01X-XXXXXXX"
+                    Message = "Invalid phone number format. Format: 01X-XXXXXXX"
                 });
             }
             if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.Password, passwordPattern))
@@ -140,7 +130,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid Password Format",
-                    message = "Password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
+                    Message = "Password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
                 });
             }
             if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.Email, emailPattern))
@@ -148,7 +138,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid Email Format",
-                    message = "Invalid email format."
+                    Message = "Invalid email format."
                 });
             }
             string otp = GeneralServices.GenerateNumber(6);
@@ -160,7 +150,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     return BadRequest(new
                     {
                         error = "User Already Exists",
-                        message = "A user with the same email and phone number already exists."
+                        Message = "A user with the same email and phone number already exists."
                     });
                 }
                 else if (existingUser.Status == "Inactive")
@@ -168,12 +158,11 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     return BadRequest(new
                     {
                         error = "User Account Inactive",
-                        message = "Your account is inactive. Please contact support for assistance."
+                        Message = "Your account is inactive. Please contact support for assistance."
                     });
                 }
                 else if (existingUser.Status == "Pending")
                 {
-                    existingUser.UserName = createUser.UserName;
                     existingUser.Password = createUser.Password;
                     existingUser.Password = createUser.Password;
                     existingUser.PhoneNumber = createUser.PhoneNumber;
@@ -186,7 +175,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             {
                 var newUser = new User
                 {
-                    UserName = createUser.UserName,
+                    UserName = "User" + GeneralServices.GenerateNumber(4),
                     Email = createUser.Email,
                     PhoneNumber = createUser.PhoneNumber,
                     Password = createUser.Password,
@@ -195,9 +184,9 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     Status = "Pending",
                     Role = "User"
                 };
-                _db.Users.Add(newUser);
+                await _db.Users.AddAsync(newUser);
             }
-            // await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync();
             string emailBody = $@"
                 <!DOCTYPE html>
                 <html>
@@ -222,7 +211,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                                 </h2>
                 
                                 <p style=""margin: 0 0 15px 0; font-size: 16px;"">
-                                    Hi <strong>{createUser.UserName}</strong>,
+                                    Hi <strong> Dear Customer </strong>,
                                 </p>
                                 <p style=""margin: 0 0 25px 0; font-size: 15px;"">
                                     Thank you for choosing DriveLink! We're excited to help you find the perfect car. To complete your registration, please use the OTP code below.
@@ -278,7 +267,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = "User not found."
+                    Message = "User not found."
                 });
             }
             if (user.Status == "Active")
@@ -286,7 +275,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "User Already Active",
-                    message = "Your account is already active. Please log in."
+                    Message = "Your account is already active. Please log in."
                 });
 
             }
@@ -295,7 +284,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "OTP Expired",
-                    message = "OTP has expired. Please request a new OTP."
+                    Message = "OTP has expired. Please request a new OTP."
                 });
             }
             if (user.OTP == verify.OTP)
@@ -315,7 +304,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid OTP",
-                    message = "Invalid OTP. Please check your email and try again."
+                    Message = "Invalid OTP. Please check your email and try again."
                 });
             }
         }
@@ -328,7 +317,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = "User not found."
+                    Message = "User not found."
                 });
             }
             if (user.Status == "Inactive")
@@ -336,7 +325,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "User Account Inactive",
-                    message = "Your account is inactive. Please contact support for assistance."
+                    Message = "Your account is inactive. Please contact support for assistance."
                 });
             }
             string otp = GeneralServices.GenerateNumber(6);
@@ -369,7 +358,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                                 </h2>
                 
                                 <p style=""margin: 0 0 15px 0; font-size: 15px;"">
-                                    Hi <strong>{user.UserName}</strong>,
+                                    Hi <strong> Dear Customer </strong>,
                                 </p>
                                 <p style=""margin: 0 0 20px 0; font-size: 15px; color: #4b5563;"">
                                     We received a request to resend your OTP. Here is your new Start Code to access your DriveLink account:
@@ -417,7 +406,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return StatusCode(500, new
                 {
                     error = "Failed to Send Email",
-                    message = "Failed to resend OTP email. Please contact support." + ex.Message
+                    Message = "Failed to resend OTP email. Please contact support." + ex.Message
                 });
             }
         }
@@ -430,7 +419,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = "User not found."
+                    Message = "User not found."
                 });
             }
             string otp = GeneralServices.GenerateNumber(6);
@@ -511,7 +500,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return StatusCode(500, new
                 {
                     error = "Failed to Send Email",
-                    message = "Failed to send password reset email. Please contact support." + ex.Message
+                    Message = "Failed to send password reset email. Please contact support." + ex.Message
                 });
             }
         }
@@ -524,7 +513,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = "User not found."
+                    Message = "User not found."
                 });
             }
             if (user.OTPGeneratedAt.HasValue && user.OTPGeneratedAt.Value.AddMinutes(10) < DateTime.Now)
@@ -532,7 +521,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "OTP Expired",
-                    message = "OTP has expired. Please request a new OTP."
+                    Message = "OTP has expired. Please request a new OTP."
                 });
 
             }
@@ -552,7 +541,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     return BadRequest(new
                     {
                         error = "Invalid OTP",
-                        message = "Invalid OTP. Please check your email and try again."
+                        Message = "Invalid OTP. Please check your email and try again."
                     });
                 }
             }
@@ -566,7 +555,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = "User not found."
+                    Message = "User not found."
                 });
             }
             if (!System.Text.RegularExpressions.Regex.IsMatch(resetPassword.NewPassword, passwordPattern))
@@ -574,7 +563,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid Password Format",
-                    message = "New password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
+                    Message = "New password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
                 });
             }
             user.Password = encoder.Encode(resetPassword.NewPassword);
@@ -596,7 +585,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = "User not found."
+                    Message = "User not found."
                 });
             }
 
@@ -606,21 +595,21 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid Credentials",
-                    message = "Incorrect email or password. Please try again."
+                    Message = "Incorrect email or password. Please try again."
                 });
             }
             if(user.Role == "Staff")
                 return BadRequest(new
                 {
                     error = "Unauthorized Role",
-                    message = "Staff accounts cannot log in through this endpoint. Please use the staff portal."
+                    Message = "Staff accounts cannot log in through this endpoint. Please use the staff portal."
                 });
             if (user.Status != "Active")
             {
                 return BadRequest(new
                 {
                     error = "Account Not Active",
-                    message = "Your account is not active. Please verify your email or contact support."
+                    Message = "Your account is not active. Please verify your email or contact support."
                 });
             }
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -668,7 +657,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid User ID",
-                    message = "User ID is missing or invalid."
+                    Message = "User ID is missing or invalid."
                 });
             }
             var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == userID);
@@ -677,7 +666,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = "User not found."
+                    Message = "User not found."
                 });
             }
             if (!System.Text.RegularExpressions.Regex.IsMatch(updateUser.PhoneNumber.ToString(), phonePattern))
@@ -685,7 +674,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid Phone Number Format",
-                    message = "Invalid phone number format. Format: 01X-XXXXXXX"
+                    Message = "Invalid phone number format. Format: 01X-XXXXXXX"
                 });
             }
             if (!System.Text.RegularExpressions.Regex.IsMatch(updateUser.Email, emailPattern))
@@ -693,7 +682,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid Email Format",
-                    message = "Invalid email format."
+                    Message = "Invalid email format."
                 });
             }
             var existingUser = await _db.Users.AnyAsync(u => u.Email == updateUser.Email && u.PhoneNumber == updateUser.PhoneNumber && u.UserID != userID);
@@ -702,7 +691,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "User Already Exists",
-                    message = "A user with the same email and phone number already exists."
+                    Message = "A user with the same email and phone number already exists."
                 });
             }
             user.UserName = updateUser.UserName;
@@ -726,7 +715,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid User ID",
-                    message = "User ID is missing or invalid."
+                    Message = "User ID is missing or invalid."
                 });
             var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == userID);
             if (user == null)
@@ -734,7 +723,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = "User not found."
+                    Message = "User not found."
                 });
             }
             var isCurrentPasswordValid = encoder.Compare(changePassword.CurrentPassword, user.Password);
@@ -743,7 +732,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid Current Password",
-                    message = "Current password is incorrect. Please try again."
+                    Message = "Current password is incorrect. Please try again."
                 });
             }
             if (!System.Text.RegularExpressions.Regex.IsMatch(changePassword.NewPassword, passwordPattern))
@@ -751,7 +740,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid New Password Format",
-                    message = "New password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
+                    Message = "New password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
                 });
             }
             user.Password = encoder.Encode(changePassword.NewPassword);
@@ -775,21 +764,21 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     return BadRequest(new
                     {
                         error = "Invalid User ID",
-                        message = "User ID is missing or invalid."
+                        Message = "User ID is missing or invalid."
                     });
                 var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == userID);
                 if (user == null)
                     return NotFound(new
                     {
                         error = "User Not Found",
-                        message = "User not found."
+                        Message = "User not found."
                     });
                 if(!System.Text.RegularExpressions.Regex.IsMatch(uploadLicense.DriverLicenseNumber, IcPattern))
                 {
                     return BadRequest(new
                     {
                         error = "Invalid Driver License Number Format",
-                        message = "Driver license number must be in the format YYMMDDXXXXXX."
+                        Message = "Driver license number must be in the format YYMMDDXXXXXX."
                     });
                 }
                 if (!ModelState.IsValid)
@@ -797,7 +786,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     return BadRequest(new
                     {
                         error = "Invalid Input",
-                        message = "Please provide valid driver license information."
+                        Message = "Please provide valid driver license information."
                     });
                 }
 
@@ -808,7 +797,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     return BadRequest(new
                     {
                         error = "Invalid File Type",
-                        message = "Only JPG, JPEG, and PNG files are allowed for the driver license image."
+                        Message = "Only JPG, JPEG, and PNG files are allowed for the driver license image."
                     });
                 }
 
@@ -833,7 +822,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                         return StatusCode(500, new
                         {
                             error = "Cloudinary Upload Failed",
-                            message = "Failed to upload driver license image. Please try again."
+                            Message = "Failed to upload driver license image. Please try again."
                         });
                     }
                 }
@@ -854,7 +843,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return StatusCode(500, new
                 {
                     error = "Failed to Upload License Information",
-                    message = "An error occurred while uploading license information. Please try again." + ex.Message
+                    Message = "An error occurred while uploading license information. Please try again." + ex.Message
                 });
             }
 
@@ -868,7 +857,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = $"User with ID {id} not found."
+                    Message = $"User with ID {id} not found."
                 });
             }
             existingUser.Status = existingUser.Status == "Active" ? "Inactive" : "Active";
@@ -890,7 +879,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid User ID",
-                    message = "User ID is missing or invalid."
+                    Message = "User ID is missing or invalid."
                 });
             }
             var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == userID);
@@ -899,7 +888,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = "User not found."
+                    Message = "User not found."
                 });
             }
             var userToken = await _db.TokenActivities.Where(t => t.UserID == userID && t.Role == user.Role && t.Token != null).ToListAsync();
@@ -922,7 +911,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid User ID",
-                    message = "User ID is missing or invalid."
+                    Message = "User ID is missing or invalid."
                 });
             }
             var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == userID);
@@ -930,7 +919,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = "User not found."
+                    Message = "User not found."
                 });
             user.Status = "Deactivated";
             user.Email = $"User{user.UserID}_{Guid.NewGuid()}@example.com";
@@ -946,13 +935,13 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
         [HttpDelete("{id}/delete")]
         public async Task<IActionResult> DeleteUser(int id)
         {
-            var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.UserID == id);
+            var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.UserID == id && u.Role != "Staff" && (u.Status == "Deactivated" || u.Status == "Inactive"));
             if (existingUser == null)
             {
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = $"User with ID {id} not found."
+                    Message = $"User with ID {id} not found."
                 });
             }
             _db.Users.Remove(existingUser);

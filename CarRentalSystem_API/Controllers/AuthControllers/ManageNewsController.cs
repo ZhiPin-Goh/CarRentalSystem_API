@@ -26,22 +26,14 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     x.PublishedDate
                 }).ToListAsync();
 
-            return Ok(new
-            {
-                Message = "News retrieved successfully.",
-                News = news
-            });
+            return Ok(news);
         }
         [HttpGet]
         public async Task<IActionResult> GetAllNews()
         {
             var news = await _db.News
                 .ToListAsync();
-            return Ok(new
-            {
-                Message = "News retrieved successfully.",
-                News = news
-            });
+            return Ok(news);
         }
         [HttpPost]
         public async Task<IActionResult> CreateNews([FromBody] CreateNewsDTO createNews)
@@ -54,6 +46,9 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     message = "Title and content are required."
                 });
             }
+            if(createNews.CoverImageURL ==  null)
+                createNews.CoverImageURL = "https://example.com/default-cover.jpg";
+
             var news = new News
             {
                 Title = createNews.Title,
@@ -98,15 +93,15 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 NewsID = existingNews.NewsID
             });
         }
-        [HttpDelete("{id}/delete-news")]
-        public async Task<IActionResult> DeleteNews(int id)
+        [HttpDelete("{newsid}")]
+        public async Task<IActionResult> DeleteNews(int newsid)
         {
-            var existingNews = await _db.News.FirstOrDefaultAsync(n => n.NewsID == id);
+            var existingNews = await _db.News.FirstOrDefaultAsync(n => n.NewsID == newsid);
             if (existingNews == null)
                 return NotFound(new
                 {
                     error = "News Not Found",
-                    message = $"News with ID {id} not found."
+                    message = $"News with ID {newsid} not found."
                 });
             if (existingNews.IsPublished)
                 return BadRequest(new
