@@ -932,7 +932,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 NewStatus = user.Status
             });
         }
-        [HttpDelete("{id}/delete")]
+        [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(int id)
         {
             var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.UserID == id && u.Role != "Staff" && (u.Status == "Deactivated" || u.Status == "Inactive"));

@@ -75,6 +75,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
 
             var result = new
             {
+                // Kpis show in the top of the dashboard
                 KPIs = new
                 {
                     TodayRevenue = todayRevenue,
@@ -84,6 +85,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     RentedVehicles = rentedVehicles,
                     UtilizationRate = UtilizationRate
                 },
+                // Charts show in the bottom of the dashboard
                 Charts = new
                 {
                     VehicleStatusBreakdown = vehicleStatusBreakdown,

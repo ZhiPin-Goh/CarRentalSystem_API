@@ -147,6 +147,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
 
             decimal deliveryFee = 0;
+            string handoverAddress = "";
             if (createBooking.HandoverMethod == "Delivery")
             {
                 var deliveryArea = await _db.DeliveryAreas.FirstOrDefaultAsync(x => x.AreaID == createBooking.DeliveryAreaID);
@@ -157,6 +158,13 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                         Message = $"No delivery area found with ID {createBooking.DeliveryAreaID}"
                     });
                 deliveryFee = deliveryArea.Fee;
+                handoverAddress = createBooking.DeliveryAddress;
+            }
+            else if (createBooking.HandoverMethod == "Self-Pickup")
+            {
+                handoverAddress = $@" No. 104, Ground Floor, Taman City, 
+                                      Jalan Kuching, 51200, Kuala Lumpur, 
+                                      Wilayah Persekutuan, Malaysia, 51200 Kuala Lumpur";
             }
 
             decimal carRentalPrice = (existingVehicle.DailyRate * totalDays);

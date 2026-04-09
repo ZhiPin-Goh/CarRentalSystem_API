@@ -265,6 +265,49 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             }
         }
         [HttpPost]
+        public async Task<IActionResult> UpdateExpiryDate([FromBody] UpdateExpiryDTO updateExpiry)
+        {
+            try
+            {
+                var vehicle = await _db.Vehicles.FirstOrDefaultAsync(v => v.VehicleID == updateExpiry.VehicleID);
+                if (vehicle == null)
+                    return NotFound(new
+                    {
+                        error = "Vehicle Not Found",
+                        message = $"Vehicle with ID {updateExpiry.VehicleID} not found."
+                    });
+                if (updateExpiry.RoadTaxExpiryDate.HasValue && updateExpiry.RoadTaxExpiryDate.Value < DateTime.Now)
+                    return BadRequest(new
+                    {
+                        error = "Invalid Road Tax Expiry Date",
+                        message = "Road tax expiry date cannot be in the past."
+                    });
+                if (updateExpiry.InsuranceExpiryDate.HasValue && updateExpiry.InsuranceExpiryDate.Value < DateTime.Now)
+                    return BadRequest(new
+                    {
+                        error = "Invalid Insurance Expiry Date",
+                        message = "Insurance expiry date cannot be in the past."
+                    });
+                vehicle.RoadTaxExpiryDate = updateExpiry.RoadTaxExpiryDate;
+                vehicle.InsuranceExpiryDate = updateExpiry.InsuranceExpiryDate;
+                await _db.SaveChangesAsync();
+                return Ok(new
+                {
+                    Message = "Vehicle expiry dates updated successfully.",
+                    VehicleID = vehicle.VehicleID
+                });
+
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    error = "Internal Server Error",
+                    message = "An error occurred while updating the vehicle expiry dates: " + ex.Message
+                });
+            }
+        }
+        [HttpPost]
         public async Task<IActionResult> UpdateVehicleImage([FromForm] UpdateVehicleImageDTO updateVehicle)
         {
             try
