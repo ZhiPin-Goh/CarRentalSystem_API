@@ -1,27 +1,29 @@
 ﻿using CarRentalSystem_API.DTO.MaintenanceRecordDTO;
 using CarRentalSystem_API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace CarRentalSystem_API.Controllers.AuthControllers
+namespace CarRentalSystem_API.Controllers.AdminControllers
 {
     [ApiController]
-    [Route("api/[controller]/[action]")]
-    [Tags("Auth Maintenance Management")]
-    public class ManageMaintenanceController : Controller
+    [Route("api/[controller]")]
+    [Authorize(Roles = "Admin")]
+    [Tags("Admin Maintenance Management")]
+    public class MaintenanceMangementController : Controller
     {
         private readonly AppDbContext _db;
-        public ManageMaintenanceController(AppDbContext db)
+        public MaintenanceMangementController(AppDbContext db)
         {
             _db = db;
         }
-        [HttpGet]
+        [HttpGet ("maintenancerecords")]
         public async Task<IActionResult> GetAllMaintenanceRecord()
         {
             var maintenanceRecords = await _db.MaintenanceRecords.ToListAsync();
             return Ok(maintenanceRecords);
         }
-        [HttpPost]
+        [HttpPost ("createmaintenance")]
         public async Task<IActionResult> CreateMaintenance([FromBody] CreateMaintenanceDTO createMaintenance)
         {
             var existingVehicle = await _db.Vehicles.AnyAsync(v => v.VehicleID == createMaintenance.VehicleID);
@@ -90,7 +92,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 }
             });
         }
-        [HttpPost]
+        [HttpPost ("updatemaintenance")]
         public async Task<IActionResult> UpdateMaintenance([FromBody] UpdateMaintenanceDTO updateMaintenance)
         {
             var existingRecord = await _db.MaintenanceRecords.FirstOrDefaultAsync(x => x.ID == updateMaintenance.ID);
@@ -147,7 +149,40 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 }
             });
         }
-        [HttpDelete("{id}/delete")]
+        [HttpPost ("donemaintenance/{id}")]
+        public async Task<IActionResult> DoneMaintenance(int id)
+        {
+            var existingRecord = await _db.MaintenanceRecords
+                .Include (x => x.Vehicle)
+                .FirstOrDefaultAsync(x => x.ID == id);
+            if(existingRecord == null)
+            {
+                return NotFound(new
+                {
+                    error = "Maintenance Record Not Found",
+                    message = $"Maintenance record with ID {id} not found."
+                });
+            }
+            existingRecord.Vehicle.Status = "Available";
+            existingRecord.EndDate = DateTime.Now;
+            existingRecord.Handler = "Admin";
+            await _db.SaveChangesAsync();
+            return Ok(new
+            {
+                message = "Maintenance marked as done successfully.",
+                Information = new
+                {
+                    existingRecord.ID,
+                    existingRecord.VehicleID,
+                    existingRecord.Description,
+                    existingRecord.Cost,
+                    existingRecord.StartDate,
+                    existingRecord.EndDate,
+                    existingRecord.Handler
+                }
+            });
+        }
+        [HttpDelete ("deletemaintenance/{id}")]
         public async Task<IActionResult> DeleteMaintenance(int id)
         {
             var existingRecord = await _db.MaintenanceRecords.FirstOrDefaultAsync(x => x.ID == id);

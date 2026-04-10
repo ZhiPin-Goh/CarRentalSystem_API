@@ -1,19 +1,22 @@
 ﻿using CarRentalSystem_API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace CarRentalSystem_API.Controllers.AuthControllers
+namespace CarRentalSystem_API.Controllers.AdminControllers
 {
     [ApiController]
-    [Route("api/[controller]/[action]")]
-    [Tags("Auth Dashboard Management")]
-    public class ManageDashboardController : Controller
+    [Route("api/[controller]")]
+    [Authorize(Roles = "Admin")]
+    [Tags("Admin Dashboard Management")]
+    public class DashboardManagementController : Controller
     {
         private readonly AppDbContext _db;
-        public ManageDashboardController(AppDbContext db)
+        public DashboardManagementController(AppDbContext db)
         {
             _db = db;
         }
+        [HttpGet("overview")]
         [HttpGet]
         public async Task<IActionResult> GetSummary()
         {

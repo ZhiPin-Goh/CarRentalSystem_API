@@ -7,6 +7,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
 {
     [ApiController]
     [Route("api/[controller]/[action]")]
+    [Tags("Auth Transaction Management")]
     public class ManageTransactionController : Controller
     {
         private readonly AppDbContext _db;
@@ -23,7 +24,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid User",
-                    Message = "User information is missing or invalid. Please log in again to access your transaction history."
+                    message = "User information is missing or invalid. Please log in again to access your transaction history."
                 });
             }
             var transaction = await _db.Transactions

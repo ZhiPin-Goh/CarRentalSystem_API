@@ -14,6 +14,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
 {
     [ApiController]
     [Route("api/[controller]/[action]")]
+    [Tags("Auth Staff Management")]
     public class ManageStaffController : Controller
     {
         private readonly AppDbContext _db;
@@ -33,13 +34,13 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "User Already Exists",
-                    Message = "A user with the provided email already exists. Please use a different email address."
+                    message = "A user with the provided email already exists. Please use a different email address."
                 });
             if (!System.Text.RegularExpressions.Regex.IsMatch(createStaff.PhoneNumber, phonePattern))
                 return BadRequest(new
                 {
                     error = "Invalid Phone Number",
-                    Message = "The provided phone number is invalid. Please enter a valid phone number in the format 01X-XXXXXXX or 01X-XXXXXXXX."
+                    message = "The provided phone number is invalid. Please enter a valid phone number in the format 01X-XXXXXXX or 01X-XXXXXXXX."
                 });
             string safeName = createStaff.Name.Length >= 5 ? createStaff.Name.Substring(0, 5) : createStaff.Name.PadRight(5, 'x');
             string password = safeName + GeneralServices.GenerateNumber(4);
@@ -60,7 +61,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             await _db.SaveChangesAsync();
             return Ok(new
             {
-                Message = "Staff Created Successfully",
+                message = "Staff Created Successfully",
                 StaffDetails = new
                 {
                     staff.UserID,
@@ -79,26 +80,26 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    Message = "No user found with the provided username. Please check the username and try again."
+                    message = "No user found with the provided username. Please check the username and try again."
                 });
             bool isPasswordValid = encoder.Compare(login.Password, staff.Password);
             if (!isPasswordValid)
                 return BadRequest(new
                 {
                     error = "Invalid Password",
-                    Message = "The password you entered is incorrect. Please try again with the correct password."
+                    message = "The password you entered is incorrect. Please try again with the correct password."
                 });
             if (staff.Role != "Staff")
                 return BadRequest(new
                 {
                     error = "Unauthorized Access",
-                    Message = "You do not have permission to access this resource. Please log in with a staff account."
+                    message = "You do not have permission to access this resource. Please log in with a staff account."
                 });
             if (staff.Status != "Active")
                 return BadRequest(new
                 {
                     error = "Account Inactive",
-                    Message = "Your account is currently inactive. Please contact the administrator for assistance."
+                    message = "Your account is currently inactive. Please contact the administrator for assistance."
                 });
 
             var tokenhandler = new JwtSecurityTokenHandler();
@@ -132,7 +133,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             await _db.SaveChangesAsync();
             return Ok(new
             {
-                Message = "Login Successful",
+                message = "Login Successful",
                 Token = tokenString,
                 StaffDetails = new
                 {
@@ -151,7 +152,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid User",
-                    Message = "Unable to identify the user. Please ensure you are logged in and try again."
+                    message = "Unable to identify the user. Please ensure you are logged in and try again."
                 });
 
             var staff = await _db.Users.FindAsync(staffID);
@@ -159,14 +160,14 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    Message = "No user found with the provided ID. Please check your login status and try again."
+                    message = "No user found with the provided ID. Please check your login status and try again."
                 });
             var token = await _db.TokenActivities.Where(x => x.UserID == staffID && x.Role == staff.Role && x.Token != null).ToListAsync();
             token.ForEach(x => x.Token = $"This token is invalidated at {DateTime.Now}. User logged out.");
             await _db.SaveChangesAsync();
             return Ok(new
             {
-                Message = "Logout Successful",
+                message = "Logout Successful",
                 Details = "Your session has been successfully terminated. All active tokens have been invalidated. Please log in again to access your account."
             });
         }
@@ -178,7 +179,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    Message = "No user found with the provided ID. Please check the staff ID and try again."
+                    message = "No user found with the provided ID. Please check the staff ID and try again."
                 });
             staff.Status = "Deactivated";
             staff.Email = $"deactivated_{staff.UserID}_{staff.Email}";
@@ -186,7 +187,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             await _db.SaveChangesAsync();
             return Ok(new
             {
-                Message = "Staff Deactivated Successfully",
+                message = "Staff Deactivated Successfully",
                 Details = $"The staff member with ID {staff.UserID}"
             });
         }

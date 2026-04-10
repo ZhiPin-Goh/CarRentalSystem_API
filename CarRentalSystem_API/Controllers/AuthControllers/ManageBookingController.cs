@@ -8,6 +8,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
 {
     [ApiController]
     [Route("api/[controller]/[action]")]
+    [Tags("Auth Booking Management")]
     public class ManageBookingController : Controller
     {
         private readonly AppDbContext _db;
@@ -23,7 +24,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "Vehicle not found",
-                    Message = $"No vehicle found with ID {vehicleid}"
+                    message = $"No vehicle found with ID {vehicleid}"
                 });
             var booking = await _db.Bookings
                 .Where(x => x.VehicleID == vehicleid &&
@@ -85,27 +86,27 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return Unauthorized(new
                 {
                     error = "Unauthorized",
-                    Message = "User must be logged in to create a booking"
+                    message = "User must be logged in to create a booking"
                 });
             var existingUser = await _db.Users.FirstOrDefaultAsync(x => x.UserID == userID);
             if (existingUser == null)
                 return NotFound(new
                 {
                     error = "User not found",
-                    Message = $"No user found with ID {userID}"
+                    message = $"No user found with ID {userID}"
                 });
             if (existingUser.DriverLicenseNumber == null && existingUser.DriverLicenseImage == null)
                 return BadRequest(new
                 {
                     error = "Driver's license required",
-                    Message = "User must have a valid driver's license to create a booking"
+                    message = "User must have a valid driver's license to create a booking"
                 });
             var existingVehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.VehicleID == createBooking.VehicleID);
             if (existingVehicle == null)
                 return NotFound(new
                 {
                     error = "Vehicle not found",
-                    Message = $"No vehicle found with ID {createBooking.VehicleID}"
+                    message = $"No vehicle found with ID {createBooking.VehicleID}"
                 });
 
             DateTime startday = createBooking.StartDate.Date;
@@ -117,13 +118,13 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid start date",
-                    Message = "Start date must be today or in the future"
+                    message = "Start date must be today or in the future"
                 });
             else if (totalDays > 30)
                 return BadRequest(new
                 {
                     error = "Invalid start date",
-                    Message = "Start date cannot be more than 30 days in the future"
+                    message = "Start date cannot be more than 30 days in the future"
                 });
 
             int rentDurationDays = (startday - today).Days;
@@ -131,7 +132,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid start date",
-                    Message = "Start date cannot be in the past"
+                    message = "Start date cannot be in the past"
                 });
 
             bool isConflict = await _db.Bookings.AnyAsync(x =>
@@ -143,7 +144,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Date conflict",
-                    Message = "The selected dates conflict with another booking for the same vehicle"
+                    message = "The selected dates conflict with another booking for the same vehicle"
                 });
 
             decimal deliveryFee = 0;
@@ -155,7 +156,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     return NotFound(new
                     {
                         error = "Delivery area not found",
-                        Message = $"No delivery area found with ID {createBooking.DeliveryAreaID}"
+                        message = $"No delivery area found with ID {createBooking.DeliveryAreaID}"
                     });
                 deliveryFee = deliveryArea.Fee;
                 handoverAddress = createBooking.DeliveryAddress;
@@ -180,14 +181,14 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     return NotFound(new
                     {
                         error = "Promotion not found",
-                        Message = $"No active promotion found with code {createBooking.PromotionCode}"
+                        message = $"No active promotion found with code {createBooking.PromotionCode}"
                     });
                 if (promotion.PromotionScope == "Type" && !string.Equals(existingVehicle.Type, promotion.TargetValue, StringComparison.OrdinalIgnoreCase))
                 {
                     return BadRequest(new
                     {
                         error = "Invalid Promotion",
-                        Message = "This promotion code is only applicable for " + promotion.TargetValue + " type vehicles!"
+                        message = "This promotion code is only applicable for " + promotion.TargetValue + " type vehicles!"
 
                     });
                 }
@@ -196,7 +197,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     return BadRequest(new
                     {
                         error = "Invalid Promotion",
-                        Message = "This promotion code is only applicable for " + promotion.TargetValue + " model vehicles!"
+                        message = "This promotion code is only applicable for " + promotion.TargetValue + " model vehicles!"
                     });
                 }
                 discountAmount = (carRentalPrice * promotion.DiscountPercentage) / 100;
@@ -225,7 +226,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             await _db.SaveChangesAsync();
             return Ok(new
             {
-                Message = "Booking created successfully",
+                message = "Booking created successfully",
                 BookingID = booking.BookingID,
                 FinalAmount = finalPaidAmount,
                 Text = $"Booking created successfully. Total price: {calculatedTotalPrice:C}, Discount: {discountAmount:C}, Final amount to pay: {finalPaidAmount:C}"
@@ -239,7 +240,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "Booking not found",
-                    Message = $"No booking found with ID {bookingid}"
+                    message = $"No booking found with ID {bookingid}"
                 });
             using var transaction = await _db.Database.BeginTransactionAsync();
             try
@@ -259,7 +260,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 await transaction.CommitAsync();
                 return Ok(new
                 {
-                    Message = "Payment processed successfully",
+                    message = "Payment processed successfully",
                     TransactionID = transactionRecord.TransactionID,
                     BookingID = existingBooking.BookingID,
                     AmountPaid = transactionRecord.Amount,
@@ -272,7 +273,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return StatusCode(500, new
                 {
                     error = "Payment processing failed",
-                    Message = ex.Message
+                    message = ex.Message
                 });
             }
             finally
@@ -288,20 +289,20 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "Booking not found",
-                    Message = $"No booking found with ID {extendBooking.BookingID}"
+                    message = $"No booking found with ID {extendBooking.BookingID}"
                 });
             if (existingBooking.EndDate >= extendBooking.NewDateTime)
                 return BadRequest(new
                 {
                     error = "Invalid date range",
-                    Message = "New end date must be greater than current end date"
+                    message = "New end date must be greater than current end date"
                 });
             int todayDate = (extendBooking.NewDateTime = existingBooking.StartDate).Day;
             if (todayDate > 30)
                 return BadRequest(new
                 {
                     error = "Invalid date range",
-                    Message = "Extension cannot be longer than 30 days"
+                    message = "Extension cannot be longer than 30 days"
                 });
 
             bool isConflicting = await _db.Bookings
@@ -314,11 +315,11 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Date conflict",
-                    Message = "The new end date conflicts with another booking for the same vehicle"
+                    message = "The new end date conflicts with another booking for the same vehicle"
                 });
             return Ok(new
             {
-                Message = "Booking can be extended",
+                message = "Booking can be extended",
                 BookingID = existingBooking.BookingID,
                 CurrentEndDate = existingBooking.EndDate,
                 NewEndDate = extendBooking.NewDateTime
@@ -332,7 +333,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "Booking not found",
-                    Message = $"No booking found with ID {extendPayment.BookingID}"
+                    message = $"No booking found with ID {extendPayment.BookingID}"
                 });
             int extraDays = (extendPayment.NewEndDate - booking.EndDate).Days;
             decimal extraCost = extraDays * booking.Vehicle.DailyRate;
@@ -356,7 +357,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 await dBtransaction.CommitAsync();
                 return Ok(new
                 {
-                    Message = "Extension payment processed successfully",
+                    message = "Extension payment processed successfully",
                     BookingID = booking.BookingID,
                     NewEndDate = booking.EndDate,
                     ExtraDays = extraDays,
@@ -371,7 +372,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return StatusCode(500, new
                 {
                     error = "Extension payment processing failed",
-                    Message = ex.Message
+                    message = ex.Message
                 });
             }
             finally
@@ -389,7 +390,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User not found",
-                    Message = $"No user found with ID {userID}"
+                    message = $"No user found with ID {userID}"
                 });
             var bookings = await _db.Bookings
                 .Where(x => x.UserID == userID && x.Status == "InProgress" && x.Vehicle.Status == "Rented" && x.StartDate <= DateTime.Today && x.EndDate >= DateTime.Today)
@@ -405,13 +406,13 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "Booking not found",
-                    Message = $"No booking found with ID {bookingid}"
+                    message = $"No booking found with ID {bookingid}"
                 });
             if (existingBooking.Status != "Pending" || existingBooking.Status != "Confirmed")
                 return BadRequest(new
                 {
                     error = "Invalid booking status",
-                    Message = "Only bookings with Pending or Confirmed status can be cancelled"
+                    message = "Only bookings with Pending or Confirmed status can be cancelled"
                 });
 
             using var transaction = await _db.Database.BeginTransactionAsync();
@@ -423,7 +424,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     return BadRequest(new
                     {
                         error = "Cancellation not allowed",
-                        Message = "Bookings can only be cancelled within 24 hours of the start date"
+                        message = "Bookings can only be cancelled within 24 hours of the start date"
                     });
                 else
                 {
@@ -442,7 +443,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 await transaction.CommitAsync();
                 return Ok(new
                 {
-                    Message = "Booking cancelled successfully",
+                    message = "Booking cancelled successfully",
                     BookingID = existingBooking.BookingID,
                     RefundAmount = refundAmount,
                     TransactionID = transactionRecord.TransactionID,
@@ -455,7 +456,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return StatusCode(500, new
                 {
                     error = "Booking cancellation failed",
-                    Message = ex.Message
+                    message = ex.Message
                 });
             }
             finally

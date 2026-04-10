@@ -1,92 +1,47 @@
-﻿using System.Linq;
-using CarRentalSystem_API.DTO.VehicleDTO;
+﻿using CarRentalSystem_API.DTO.VehicleDTO;
 using CarRentalSystem_API.Function;
 using CarRentalSystem_API.Models;
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
-namespace CarRentalSystem_API.Controllers.AuthControllers
+namespace CarRentalSystem_API.Controllers.AdminControllers
 {
     [ApiController]
-    [Route("api/[controller]/[action]")]
-    [Tags("Auth Vehicle Management")]
-    public class ManageVehicleController : Controller
+    [Route("api/[controller]")]
+    [Authorize(Roles = "Admin")]
+    [Tags("Admin Vehicle Management")]
+    public class VehicleManagementController : Controller
     {
-        private readonly AppDbContext _db;
+       private readonly AppDbContext _db;
         private readonly IConfiguration _config;
-        public ManageVehicleController(AppDbContext db, IConfiguration config)
+        public VehicleManagementController(AppDbContext db, IConfiguration config)
         {
             _db = db;
             _config = config;
-        }
 
+        }
         [HttpGet]
         public async Task<IActionResult> GetAllVehicle()
         {
-            var vehicles = await _db.Vehicles.ToListAsync();
+            var vehicles = await _db.Vehicles
+                .Include(v => v.VehicleImages)
+                .ToListAsync();
             return Ok(vehicles);
         }
         [HttpGet]
-        public async Task<IActionResult> GetHomePageVehicles()
+        public async Task<IActionResult> GetAvailableVehicle()
         {
-            var vehicles = await _db.Vehicles
-                .Where(v => v.Status == "Available" || v.Status == "Rented")
-                .Include(v => v.VehicleImages)
-                .Take(6)
-                .Select(v => new
-                {
-                    v.VehicleID,
-                    v.Brand,
-                    v.Model,
-                    v.Type,
-                    v.DailyRate,
-                    IsAvaliableNow = v.Status == "Available",
-                    PrimaryImageURL = v.VehicleImages.FirstOrDefault(img => img.IsPrimary).ImageURL
-                })
-                .ToListAsync();
-            var activePromtions = await _db.Promotions
-                .Where(p => p.StartDate <= DateTime.Now && p.EndDate >= DateTime.Now)
-                .Select(p => new
-                {
-                    p.PromotionID,
-                    p.DiscountPercentage,
-                })
-                .ToListAsync();
-            return Ok(new
-            {
-                Vehicles = vehicles,
-                Promotions = activePromtions
-            });
-        }
-        [HttpPost]
-        public async Task<IActionResult> SearchVehicle([FromBody] SearchVechileDTO searchVechile)
-        {
-            if (searchVechile.StartDate >= searchVechile.EndDate)
-                return BadRequest(new
-                {
-                    error = "Invalid Date Range",
-                    message = "Start date must be earlier than end date."
-                });
-            var bookedVehicleIds = await _db.Bookings
-               .Where(b => (b.Status == "Pending" || b.Status == "Confirmed" || b.Status == "InProgress") &&
-                    b.StartDate < searchVechile.EndDate &&
-                    b.EndDate > searchVechile.StartDate)
-               .Select(b => b.VehicleID)
-               .Distinct()
-               .ToListAsync();
-
-            var availableVehicles = await _db.Vehicles
-                .Include(v => v.VehicleImages)
-                .Where(v => !bookedVehicleIds.Contains(v.VehicleID))
-                .Where(v => v.Status == "Available")
-                .ToListAsync();
+                var availableVehicles = await _db.Vehicles
+                    .Where(v => v.Status == "Available")
+                    .Include(v => v.VehicleImages)
+                    .ToListAsync();
             return Ok(availableVehicles);
         }
-
-        [HttpPost]
+        [HttpPost ("createvehicle")]
         public async Task<IActionResult> CreateVehicle([FromForm] CreateVehicleDTO vehicleDTO)
         {
             try
@@ -223,7 +178,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
-        [HttpPost]
+        [HttpPost("updatevehicle")]
         public async Task<IActionResult> UpdateVehicleInformation([FromBody] UpdateVehicleInformationDTO updateVehicle)
         {
             try
@@ -268,7 +223,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
-        [HttpPost]
+        [HttpPost("updateexpiry")]
         public async Task<IActionResult> UpdateExpiryDate([FromBody] UpdateExpiryDTO updateExpiry)
         {
             try
@@ -311,7 +266,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
-        [HttpPost]
+        [HttpPost("updatevehicleimage")]
         public async Task<IActionResult> UpdateVehicleImage([FromForm] UpdateVehicleImageDTO updateVehicle)
         {
             try
@@ -431,7 +386,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
-        [HttpDelete("{id}/delete")]
+        [HttpDelete("deletevehicle/{id}")]
         public async Task<IActionResult> DeleteVehicle(int id)
         {
             var vehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.VehicleID == id);
@@ -489,7 +444,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 VehicleID = id
             });
         }
-        [HttpPost("{id}/toggle-status")]
+        [HttpPost("togglevehiclestatus/{id}")]
         public async Task<IActionResult> ToggleVehicleStatus(int id)
         {
             var vehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.VehicleID == id);

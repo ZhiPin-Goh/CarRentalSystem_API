@@ -108,12 +108,14 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 // This is background services (automation tasks)
-builder.Services.AddHostedService<VehicleStatusUpdateService>();
-builder.Services.AddHostedService<UserStatusDeleteServices>();
 builder.Services.AddHostedService<BannersStatusUpdateServices>();
 builder.Services.AddHostedService<BookingTimeoutServices>();
-builder.Services.AddHostedService<UserStatusDeleteServices>();
+builder.Services.AddHostedService<DailyFinancialJobServices>();
+builder.Services.AddHostedService<EmptyUserOtpServices>();
 builder.Services.AddHostedService<PromotionStatusUpdateServices>();
+builder.Services.AddHostedService<TripRemindersServices>();
+builder.Services.AddHostedService<UserStatusDeleteServices>();
+builder.Services.AddHostedService<VehicleStatusUpdateService>();
 
 var app = builder.Build();
 app.UseStaticFiles();
@@ -123,6 +125,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+app.UseRouting();
 
 // This is global exception handling middleware (jwt)
 app.UseAuthorization();

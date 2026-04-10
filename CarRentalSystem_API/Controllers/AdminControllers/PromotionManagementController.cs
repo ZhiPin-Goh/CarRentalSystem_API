@@ -1,36 +1,29 @@
 ﻿using CarRentalSystem_API.DTO.PromotionDTO;
 using CarRentalSystem_API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace CarRentalSystem_API.Controllers.AuthControllers
+namespace CarRentalSystem_API.Controllers.AdminControllers
 {
+    [Route("api/[controller]")]
     [ApiController]
-    [Route("api/[controller]/[action]")]
-    [Tags("Auth Promotion Management")]
-    public class ManagePromotionController : Controller
+    [Authorize(Roles = "Admin")]
+    [Tags("Admin Promotion Management")]
+    public class PromotionManagementController : Controller
     {
         private readonly AppDbContext _db;
-        public ManagePromotionController(AppDbContext db)
+        public PromotionManagementController(AppDbContext db)
         {
             _db = db;
         }
-        [HttpGet]
+        [HttpGet("promotions")]
         public async Task<IActionResult> GetAllPromotions()
         {
             var promotions = await _db.Promotions.ToListAsync();
             return Ok(promotions);
         }
-        [HttpGet]
-        public async Task<IActionResult> GetActivePromtions()
-        {
-            var activePromotions = await _db.Promotions
-                .Where(p => p.IsActive && p.StartDate <= DateTime.Now && p.EndDate >= DateTime.Now)
-                .ToListAsync();
-           
-            return Ok(activePromotions);
-        }
-        [HttpPost]
+        [HttpPost("createpromotion")]
         public async Task<IActionResult> CreatePromotion([FromBody] CreatePromotionDTO createPromotion)
         {
             var existingPromotion = await _db.Promotions.AnyAsync(p => p.PromotionCode == createPromotion.PromotionCode);
@@ -52,7 +45,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     error = "Invalid Discount Percentage",
                     message = "Discount percentage must be between 0 and 100."
                 });
-            if(createPromotion.MaxDiscountAmount != null)
+            if (createPromotion.MaxDiscountAmount != null)
             {
                 if (createPromotion.MaxDiscountAmount <= 0)
                     return BadRequest(new
@@ -61,7 +54,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                         message = "Max discount amount must be greater than 0."
                     });
             }
-            else 
+            else
                 createPromotion.MaxDiscountAmount = null;
 
             var promotion = new Promotion
@@ -84,7 +77,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 PromotionID = promotion.PromotionID
             });
         }
-        [HttpPost]
+        [HttpPost("updatepromotion")]
         public async Task<IActionResult> UpdatePromotion([FromBody] UpdatePromotionDTO updatePromotion)
         {
             var existingPromotion = await _db.Promotions.FirstOrDefaultAsync(p => p.PromotionID == updatePromotion.PromotionID);
@@ -113,7 +106,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                         error = "Invalid Max Discount Amount",
                         message = "Max discount amount must be greater than 0."
                     });
-                
+
             _db.Entry(existingPromotion).CurrentValues.SetValues(updatePromotion);
             await _db.SaveChangesAsync();
             return Ok(new
@@ -122,23 +115,8 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 PromotionID = existingPromotion.PromotionID
             });
         }
-        [HttpDelete("{id}/delete")]
-        public async Task<IActionResult> DeletePromotion(int id)
-        {
-            var existingPromotion = await _db.Promotions.FirstOrDefaultAsync(p => p.PromotionID == id);
-            if (existingPromotion == null)
-                return NotFound($"Promotion with ID {id} not found.");
-            if (existingPromotion.StartDate <= DateTime.Now && existingPromotion.EndDate >= DateTime.Now)
-                return BadRequest("Cannot delete an active promotion.");
-            _db.Promotions.Remove(existingPromotion);
-            await _db.SaveChangesAsync();
-            return Ok(new
-            {
-                message = "Promotion deleted successfully.",
-                PromotionID = id
-            });
-        }
-        [HttpPost("{id}/toggle-status")]
+      
+        [HttpPost("togglepromotionstatus/{id}")]
         public async Task<IActionResult> TogglePromotionStatus(int id)
         {
             var existingPromotion = await _db.Promotions.FirstOrDefaultAsync(p => p.PromotionID == id);

@@ -1,17 +1,19 @@
 ﻿using CarRentalSystem_API.DTO.NewsDTO;
 using CarRentalSystem_API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace CarRentalSystem_API.Controllers.AuthControllers
+namespace CarRentalSystem_API.Controllers.AdminControllers
 {
     [ApiController]
-    [Route("api/[controller]/[action]")]
-    [Tags("Auth News Management")]
-    public class ManageNewsController : Controller
+    [Route("api/[controller]")]
+    [Authorize(Roles = "Admin")]
+    [Tags("Admin News Management")]
+    public class NewsManagementController : Controller
     {
-        private readonly AppDbContext _db;
-        public ManageNewsController(AppDbContext db)
+      private readonly AppDbContext _db;
+        public NewsManagementController(AppDbContext db)
         {
             _db = db;
         }
@@ -29,14 +31,14 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
 
             return Ok(news);
         }
-        [HttpGet]
+        [HttpGet ("news")]
         public async Task<IActionResult> GetAllNews()
         {
             var news = await _db.News
                 .ToListAsync();
             return Ok(news);
         }
-        [HttpPost]
+        [HttpPost ("createnews")]
         public async Task<IActionResult> CreateNews([FromBody] CreateNewsDTO createNews)
         {
             if (string.IsNullOrWhiteSpace(createNews.Title) || string.IsNullOrWhiteSpace(createNews.Content))
@@ -47,7 +49,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     message = "Title and content are required."
                 });
             }
-            if(createNews.CoverImageURL ==  null)
+            if (createNews.CoverImageURL == null)
                 createNews.CoverImageURL = "https://example.com/default-cover.jpg";
 
             var news = new News
@@ -60,7 +62,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 PublishedDate = DateTime.UtcNow,
                 IsPublished = true
             };
-            _db.News.Add(news);
+            await _db.News.AddAsync(news);
             await _db.SaveChangesAsync();
             return Ok(new
             {
@@ -68,7 +70,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 NewsID = news.NewsID
             });
         }
-        [HttpPost]
+        [HttpPost ("updatenews")]
         public async Task<IActionResult> UpdateNews([FromBody] UpdateNewDTO updateNew)
         {
             var existingNews = await _db.News.FirstOrDefaultAsync(n => n.NewsID == updateNew.NewsID);
@@ -94,7 +96,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 NewsID = existingNews.NewsID
             });
         }
-        [HttpDelete("{newsid}")]
+        [HttpDelete("deletenews/{newsid}")]
         public async Task<IActionResult> DeleteNews(int newsid)
         {
             var existingNews = await _db.News.FirstOrDefaultAsync(n => n.NewsID == newsid);
@@ -118,7 +120,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 NewsID = existingNews.NewsID
             });
         }
-        [HttpPost("{id}/toggle-publish")]
+        [HttpPost("togglenewsstatus/{id}")]
         public async Task<IActionResult> ToggleNewsStatus(int id)
         {
             var existingNews = await _db.News.FirstOrDefaultAsync(n => n.NewsID == id);

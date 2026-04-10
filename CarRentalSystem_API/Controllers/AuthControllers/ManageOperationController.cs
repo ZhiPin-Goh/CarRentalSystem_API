@@ -10,6 +10,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
 {
     [ApiController]
     [Route("api/[controller]/[action]")]
+    [Tags("Auth Operation Management")]
     public class ManageOperationController : Controller
     {
         private readonly AppDbContext _db;
@@ -62,14 +63,14 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Invalid input data.",
-                    Message = "Please ensure all required fields are filled correctly."
+                    message = "Please ensure all required fields are filled correctly."
                 });
             int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
             if (userID == 0)
                 return Unauthorized(new
                 {
                     error = "User not authenticated.",
-                    Message = "Please log in to submit a handover report."
+                    message = "Please log in to submit a handover report."
                 });
 
             var booking = await _db.Bookings.FindAsync(createReport.BookingID);
@@ -77,14 +78,14 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "Booking not found.",
-                    Message = $"No booking found with ID {createReport.BookingID}."
+                    message = $"No booking found with ID {createReport.BookingID}."
                 });
             var vehicle = await _db.Vehicles.FindAsync(booking.VehicleID);
             if (vehicle == null)
                 return NotFound(new
                 {
                     error = "Vehicle not found.",
-                    Message = $"No vehicle found for booking ID {createReport.BookingID}."
+                    message = $"No vehicle found for booking ID {createReport.BookingID}."
                 });
 
             using var transaction = await _db.Database.BeginTransactionAsync();
@@ -145,7 +146,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 await transaction.CommitAsync();
                 return Ok(new
                 {
-                    Message = $"{reportType} processed successfully.",
+                    message = $"{reportType} processed successfully.",
                     ReportID = report.ReportID,
                     BookingStatus = booking.Status,
                     VehicleStatus = vehicle.Status
@@ -157,7 +158,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return StatusCode(500, new
                 {
                     error = "An error occurred while processing the handover report.",
-                    Message = ex.Message
+                    message = ex.Message
                 });
             }
             finally
@@ -175,14 +176,14 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Booking not found.",
-                    Message = $"No booking found with ID {bookingid}."
+                    message = $"No booking found with ID {bookingid}."
                 });
 
             if (booking.Status == "Completed")
                 return BadRequest(new
                 {
                     error = "Booking already completed.",
-                    Message = $"Booking ID {bookingid} is already marked as completed."
+                    message = $"Booking ID {bookingid} is already marked as completed."
                 });
 
             var reportHandover = await _db.HandoverReports
@@ -191,7 +192,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return BadRequest(new
                 {
                     error = "Return report missing.",
-                    Message = $"No return handover report found for booking ID {bookingid}. Please submit the return report before marking the booking as completed."
+                    message = $"No return handover report found for booking ID {bookingid}. Please submit the return report before marking the booking as completed."
                 });
 
             booking.Status = "Completed";
@@ -204,7 +205,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
 
             return Ok(new
             {
-                Message = $"Booking ID {bookingid} marked as completed successfully."
+                message = $"Booking ID {bookingid} marked as completed successfully."
             });
         }
         // Handover Report API finished
@@ -244,26 +245,26 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "Booking not found.",
-                    Message = $"No booking found with ID {assign.BookingID}."
+                    message = $"No booking found with ID {assign.BookingID}."
                 });
             if (booking.Status != "Confirmed" && booking.Status != "Pending")
                 return BadRequest(new
                 {
                     error = "Invalid booking status.",
-                    Message = $"Booking ID {assign.BookingID} is not in a valid state for staff assignment."
+                    message = $"Booking ID {assign.BookingID} is not in a valid state for staff assignment."
                 });
             var staff = await _db.Users.FindAsync(assign.StaffID);
             if (staff == null || staff.Role != "Staff")
                 return NotFound(new
                 {
                     error = "Staff not found.",
-                    Message = $"No staff found with ID {assign.StaffID}."
+                    message = $"No staff found with ID {assign.StaffID}."
                 });
             booking.AssignedStaffID = assign.StaffID;
             await _db.SaveChangesAsync();
             return Ok(new
             {
-                Message = $"Staff {staff.UserName} assigned to booking ID {assign.BookingID} successfully."
+                message = $"Staff {staff.UserName} assigned to booking ID {assign.BookingID} successfully."
             });
         }
         [HttpGet]
@@ -274,7 +275,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return NotFound(new
                 {
                     error = "User not authenticated.",
-                    Message = "Please log in to view assigned bookings."
+                    message = "Please log in to view assigned bookings."
                 });
             var bookings = await _db.Bookings
                 .Where(b => b.AssignedStaffID == staffID && (b.Status == "InProgress" || b.Status == "Confirmed"))

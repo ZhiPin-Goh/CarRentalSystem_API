@@ -11,6 +11,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
 {
     [ApiController]
     [Route("api/[controller]/[action]")]
+    [Tags("Auth Token Management")]
     public class AuthTokenController : Controller
     {
         private readonly AppDbContext _db;

@@ -1,49 +1,35 @@
-using CarRentalSystem_API.DTO.BannersDTO;
+﻿using CarRentalSystem_API.DTO.BannersDTO;
 using CarRentalSystem_API.Function;
 using CarRentalSystem_API.Models;
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
-namespace CarRentalSystem_API.Controllers.AuthControllers
+namespace CarRentalSystem_API.Controllers.AdminControllers
 {
     [ApiController]
-    [Route("api/[controller]/[action]")]
-    [Tags("Auth Banner Management")]
-    public class ManageBannersController : Controller
+    [Route("api/[controller]")]
+    [Authorize(Roles = "Admin")]
+    [Tags("Admin Banners Management")]
+    public class BannersManagementController : Controller
     {
         private readonly AppDbContext _db;
         private readonly IConfiguration _config;
-        public ManageBannersController(AppDbContext db, IConfiguration config)
+        public BannersManagementController(AppDbContext db, IConfiguration config)
         {
             _db = db;
             _config = config;
         }
-        // This is used to get all the banners for the home page, it will return only the active banners that are within the start and end date range
-        [HttpGet]
-        public async Task<IActionResult> GetActiveBanners()
-        {
-            var banners = await _db.Banners
-            .Where(x => x.StartDate <= DateTime.UtcNow && x.EndDate >= DateTime.UtcNow && x.IsActive)
-            .OrderBy(x => x.SortOrder)
-            .Select(x => new
-            {
-                x.Title,
-                x.Description,
-                x.ImageURL,
-                x.TargetURL,
-            }).ToListAsync();
-            return Ok(banners);
-        }
-        //This is admin only, it will return all the banners regardless of the active status and date range
-        [HttpGet]
+        [HttpGet("banners")]
         public async Task<IActionResult> GetAllBanners()
         {
             var banners = await _db.Banners.ToListAsync();
             return Ok(banners);
         }
-        [HttpPost]
+        [HttpPost("createbanner")]
         public async Task<IActionResult> CreateBanner([FromForm] CreateBannersDTO createBanners)
         {
             try
@@ -146,7 +132,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
-        [HttpPost]
+        [HttpPost("updatebanner")]
         public async Task<IActionResult> UpdateBanner([FromForm] UpdateBannersDTO updateBanners)
         {
             try
@@ -237,7 +223,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
-        [HttpDelete("{bannnersid}")]
+        [HttpDelete("deletebanner/{bannnersid}")]
         public async Task<IActionResult> DeleteBanner(int bannnersid)
         {
             try
@@ -289,16 +275,16 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
-        [HttpPost("{banners}/toggle")]
-        public async Task<IActionResult> ToggleBannerStatus(int banners)
+        [HttpPost("togglebannerstatus/{bannersid}")]
+        public async Task<IActionResult> ToggleBannerStatus(int bannersid)
         {
-            var banner = await _db.Banners.FirstOrDefaultAsync(b => b.BannersID == banners);
+            var banner = await _db.Banners.FirstOrDefaultAsync(b => b.BannersID == bannersid);
             if (banner == null)
             {
                 return NotFound(new
                 {
                     error = "Banner not found.",
-                    message = $"No banner with ID {banners} exists in the database."
+                    message = $"No banner with ID {bannersid} exists in the database."
                 });
             }
             banner.IsActive = !banner.IsActive;
@@ -306,10 +292,9 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             return Ok(new
             {
                 message = $"Banner {(banner.IsActive ? "activated" : "deactivated")} successfully.",
-                BannerID = banners,
+                BannerID = bannersid,
                 NewStatus = banner.IsActive ? "Active" : "Inactive"
             });
         }
-
     }
 }
