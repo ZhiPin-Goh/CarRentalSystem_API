@@ -12,7 +12,6 @@ namespace CarRentalSystem_API.Models
         public string Status { get; set; }//
         public string? DriverLicenseNumber { get; set; }
         public string? DriverLicenseImage { get; set; }
-        public string? TelegramID { get; set; }
         public string? OTP { get; set; }
         public DateTime? OTPGeneratedAt { get; set; }
         public string? Role { get; set; }   

@@ -68,7 +68,6 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 Password = encoder.Encode(password),
                 Status = "Active",
                 DriverLicenseNumber = null,
-                TelegramID = null,
                 OTP = null,
                 OTPGeneratedAt = null,
                 Role = "Staff",
