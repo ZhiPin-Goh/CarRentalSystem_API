@@ -26,6 +26,22 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             _db = db;
             _config = config;
         }
+        [HttpGet("staff")]
+        public async Task<IActionResult> GetStaff()
+        {
+            var staffList = await _db.Users
+                .Where(u => u.Role == "Staff")
+                .Select(s => new
+                {
+                    s.UserID,
+                    s.UserName,
+                    s.Email,
+                    s.PhoneNumber,
+                    s.Status
+                })
+                .ToListAsync();
+            return Ok(staffList);
+        }
         [HttpPost]
         public async Task<IActionResult> CreateStaff([FromBody] CreateStaffDTO createStaff)
         {

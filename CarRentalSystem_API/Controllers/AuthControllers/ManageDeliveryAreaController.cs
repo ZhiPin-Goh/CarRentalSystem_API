@@ -19,12 +19,12 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
         public async Task<IActionResult> GetAllDeliveryArea()
         {
             var areas = await _db.DeliveryAreas
-                .Where(a => a.IsActive)
                 .Select(a => new
                 {
                     a.AreaID,
                     a.AreaName,
-                    a.Fee
+                    a.Fee,
+                    Status = a.IsActive ? "Active" : "Inactive"
                 })
                 .ToListAsync();
             if (areas == null || areas.Count == 0)

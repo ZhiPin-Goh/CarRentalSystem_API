@@ -1,16 +1,22 @@
-using System.Text;
 using CarRentalSystem_API.Function.BackgroundServices;
 using CarRentalSystem_API.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Malaysia time zone configuration UTC+8
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 
@@ -19,7 +25,7 @@ builder.Services.AddSwaggerGen(x =>
 {
     x.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "Car Rental System API",
+        Title = "Car Rental ystem API",
         Version = "v1",
     });
     x.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -120,7 +126,7 @@ builder.Services.AddHostedService<VehicleStatusUpdateService>();
 var app = builder.Build();
 app.UseStaticFiles();
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
@@ -128,6 +134,7 @@ if (app.Environment.IsDevelopment())
 app.UseRouting();
 
 // This is global exception handling middleware (jwt)
+app.UseAuthentication(); 
 app.UseAuthorization();
 
 app.MapControllers();

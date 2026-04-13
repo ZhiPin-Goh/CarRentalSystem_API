@@ -1,18 +1,20 @@
 ﻿using CarRentalSystem_API.DTO.BookingDTO;
 using CarRentalSystem_API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
-namespace CarRentalSystem_API.Controllers.AuthControllers
+namespace CarRentalSystem_API.Controllers.UserControllers
 {
     [ApiController]
-    [Route("api/[controller]/[action]")]
-    [Tags("Auth Booking Management")]
-    public class ManageBookingController : Controller
+    [Route("api/user/booking")]
+    [Tags("User Booking")]
+    [Authorize(Roles = "User")]
+    public class BookingUserController : Controller
     {
         private readonly AppDbContext _db;
-        public ManageBookingController(AppDbContext db)
+        public BookingUserController(AppDbContext db)
         {
             _db = db;
         }
@@ -55,30 +57,24 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             }
             return Ok(unavailableDates);
         }
-        [HttpGet]
-        public async Task<IActionResult> GetAllBooking()
+        [HttpGet ("progress")]
+        public async Task<IActionResult> GetBookingProgress()
         {
+            int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            var existingUser = await _db.Users.AnyAsync(x => x.UserID == userID);
+            if (!existingUser)
+                return NotFound(new
+                {
+                    error = "User not found",
+                    message = $"No user found with ID {userID}"
+                });
             var bookings = await _db.Bookings
-                .Include(x => x.User)
+                .Where(x => x.UserID == userID && x.Status == "InProgress" && x.Vehicle.Status == "Rented" && x.StartDate <= DateTime.Today && x.EndDate >= DateTime.Today)
                 .Include(x => x.Vehicle)
-                .Include(x => x.Promotion)
                 .ToListAsync();
-            var bookingList = bookings.Select(b => new
-            {
-                BookingID = b.BookingID,
-                UserName = b.User,
-                VehicleModel = b.Vehicle.Model,
-                StartDate = b.StartDate,
-                EndDate = b.EndDate,
-                TotalPrice = b.TotalPrice,
-                DiscountAmount = b.DiscountAmount,
-                FinalPaidAmount = b.FinalPaidAmount,
-                PromotionCode = b.Promotion != null ? b.Promotion.PromotionCode : null,
-                Status = b.Status
-            });
-            return Ok(bookingList);
+            return Ok(bookings);
         }
-        [HttpPost]
+        [HttpPost ("createbooking")]
         public async Task<IActionResult> CreateBooking([FromBody] CreateBookingDTO createBooking)
         {
             int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
@@ -260,7 +256,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 Text = $"Booking created successfully. Total price: {calculatedTotalPrice:C}, Discount: {discountAmount:C}, Final amount to pay: {finalPaidAmount:C}"
             });
         }
-        [HttpPost("{bookingid}")]
+        [HttpPost ("processpayment/{bookingid}")]
         public async Task<IActionResult> ProcessPayment(int bookingid)
         {
             var existingBooking = await _db.Bookings.FirstOrDefaultAsync(x => x.BookingID == bookingid);
@@ -309,7 +305,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 await transaction.DisposeAsync();
             }
         }
-        [HttpPost]
+        [HttpPost ("extendbooking")]
         public async Task<IActionResult> ExtendBooking([FromBody] ExtendBookingDTO extendBooking)
         {
             var existingBooking = await _db.Bookings.FirstOrDefaultAsync(x => x.BookingID == extendBooking.BookingID);
@@ -327,7 +323,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             int todayDate = (extendBooking.NewDateTime - existingBooking.EndDate).Days;
             if (todayDate > 30)
-            return BadRequest(new
+                return BadRequest(new
                 {
                     error = "Invalid date range",
                     message = "Extension cannot be longer than 30 days"
@@ -353,7 +349,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 NewEndDate = extendBooking.NewDateTime
             });
         }
-        [HttpPost]
+        [HttpPost ("processextensionpayment")]
         public async Task<IActionResult> ProcessExtensionPayment([FromBody] ExtendPaymentDTO extendPayment)
         {
             var booking = await _db.Bookings.Include(x => x.Vehicle).FirstOrDefaultAsync(x => x.BookingID == extendPayment.BookingID);
@@ -408,25 +404,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 await dBtransaction.DisposeAsync();
             }
         }
-
-        [HttpGet]
-        public async Task<IActionResult> GetBookingProgress()
-        {
-            int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
-            var existingUser = await _db.Users.AnyAsync(x => x.UserID == userID);
-            if (!existingUser)
-                return NotFound(new
-                {
-                    error = "User not found",
-                    message = $"No user found with ID {userID}"
-                });
-            var bookings = await _db.Bookings
-                .Where(x => x.UserID == userID && x.Status == "InProgress" && x.Vehicle.Status == "Rented" && x.StartDate <= DateTime.Today && x.EndDate >= DateTime.Today)
-                .Include(x => x.Vehicle)
-                .ToListAsync();
-            return Ok(bookings);
-        }
-        [HttpPost("{bookingid}")]
+        [HttpPost ("cancelbooking/{bookingid}")]
         public async Task<IActionResult> CancelBooking(int bookingid)
         {
             var existingBooking = await _db.Bookings.FirstOrDefaultAsync(x => x.BookingID == bookingid);

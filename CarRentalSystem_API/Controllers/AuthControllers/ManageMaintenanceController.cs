@@ -54,14 +54,10 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     message = "Cost cannot be negative."
                 });
             }
-            if (createMaintenance.Cost > 0)
+            var vehicle = await _db.Vehicles.FirstOrDefaultAsync(v => v.VehicleID == createMaintenance.VehicleID);
+            if (vehicle != null && vehicle.Status != "Maintenance")
             {
-                var vehicle = await _db.Vehicles.FirstOrDefaultAsync(v => v.VehicleID == createMaintenance.VehicleID);
-                if (vehicle != null && vehicle.Status != "Maintenance")
-                {
-                    vehicle.Status = "Maintenance";
-                    await _db.SaveChangesAsync();
-                }
+                vehicle.Status = "Maintenance";
             }
 
             var maintenanceRecord = new MaintenanceRecord

@@ -1,5 +1,4 @@
-﻿using System.Linq;
-using CarRentalSystem_API.DTO.VehicleDTO;
+﻿using CarRentalSystem_API.DTO.VehicleDTO;
 using CarRentalSystem_API.Function;
 using CarRentalSystem_API.Models;
 using CloudinaryDotNet;
@@ -7,6 +6,8 @@ using CloudinaryDotNet.Actions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Linq;
+using static Org.BouncyCastle.Asn1.Cmp.Challenge;
 
 namespace CarRentalSystem_API.Controllers.AuthControllers
 {
@@ -26,7 +27,25 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
         [HttpGet]
         public async Task<IActionResult> GetAllVehicle()
         {
-            var vehicles = await _db.Vehicles.ToListAsync();
+            var vehicles = await _db.Vehicles
+                .Include(x => x.VehicleImages)
+                .Select(v => new
+                {
+                    v.VehicleID,
+                    v.Brand,
+                    v.Model,
+                    v.Year,
+                    v.LicensePlate,
+                    v.DailyRate,
+                    v.Status,
+                    v.Type,
+                    v.FuelType,
+                    v.SpecsInfo,
+                    PrimaryImageURL = v.VehicleImages
+                   .Where(img => img.IsPrimary)
+                   .Select(img => img.ImageURL)
+                   .FirstOrDefault()
+                }).ToListAsync();
             return Ok(vehicles);
         }
         [HttpGet]
@@ -44,7 +63,10 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     v.Type,
                     v.DailyRate,
                     IsAvaliableNow = v.Status == "Available",
-                    PrimaryImageURL = v.VehicleImages.FirstOrDefault(img => img.IsPrimary).ImageURL
+                    PrimaryImageURL = v.VehicleImages
+                   .Where(img => img.IsPrimary)
+                   .Select(img => img.ImageURL)
+                   .FirstOrDefault()
                 })
                 .ToListAsync();
             var activePromtions = await _db.Promotions
@@ -61,29 +83,110 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 Promotions = activePromtions
             });
         }
-        [HttpPost]
-        public async Task<IActionResult> SearchVehicle([FromBody] SearchVechileDTO searchVechile)
+        [HttpGet]
+        public async Task<IActionResult> SearchTypeSearch([FromQuery] string? brand, [FromQuery] string? type, [FromQuery] decimal? maxPrice)
         {
-            if (searchVechile.StartDate >= searchVechile.EndDate)
-                return BadRequest(new
-                {
-                    error = "Invalid Date Range",
-                    message = "Start date must be earlier than end date."
-                });
-            var bookedVehicleIds = await _db.Bookings
-               .Where(b => (b.Status == "Pending" || b.Status == "Confirmed" || b.Status == "InProgress") &&
-                    b.StartDate < searchVechile.EndDate &&
-                    b.EndDate > searchVechile.StartDate)
-               .Select(b => b.VehicleID)
-               .Distinct()
-               .ToListAsync();
-
-            var availableVehicles = await _db.Vehicles
+            IQueryable<Vehicle> query = _db.Vehicles.Include(v => v.VehicleImages).Where(v => v.Status == "Available");
+            if (!string.IsNullOrEmpty(brand) && brand != "Any")
+            {
+                query = query.Where(v => v.Brand == brand);
+            }
+            if (!string.IsNullOrEmpty(type) && type != "Any")
+            {
+                query = query.Where(v => v.Type == type);
+            }
+            if (maxPrice.HasValue && maxPrice.Value > 0)
+            {
+                query = query.Where(v => v.DailyRate <= maxPrice.Value);
+            }
+            var result = await query.Select(v => new
+            {
+                v.VehicleID,
+                v.Brand,
+                v.Model,
+                v.Type,
+                v.DailyRate,
+                IsAvaliableNow = v.Status == "Available",
+                PrimaryImageURL = v.VehicleImages
+                   .Where(img => img.IsPrimary)
+                   .Select(img => img.ImageURL)
+                   .FirstOrDefault()
+            }).ToListAsync();
+            return Ok(result);
+        }
+        [HttpGet("{licensePlate}")]
+        public async Task<IActionResult> SearchVehicle(string licensePlate)
+        {
+            var vehicle = await _db.Vehicles
                 .Include(v => v.VehicleImages)
-                .Where(v => !bookedVehicleIds.Contains(v.VehicleID))
-                .Where(v => v.Status == "Available")
-                .ToListAsync();
-            return Ok(availableVehicles);
+                .Where(v => v.LicensePlate == licensePlate)
+                .Select(v => new
+                {
+                    v.VehicleID,
+                    v.Brand,
+                    v.Model,
+                    v.Year,
+                    v.LicensePlate,
+                    v.DailyRate,
+                    v.Status,
+                    v.Type,
+                    v.FuelType,
+                    v.SpecsInfo,
+                    PrimaryImageURL = v.VehicleImages.FirstOrDefault(img => img.IsPrimary).ImageURL
+                }).FirstOrDefaultAsync();
+            if (vehicle == null)
+                return NotFound(new
+                {
+                    error = "Vehicle Not Found",
+                    message = $"No vehicle found with license plate {licensePlate}. Please check the license plate and try again."
+                });
+            return Ok(vehicle);
+        }
+        [HttpPost]
+        public async Task<IActionResult> SearchDateVehicle([FromBody] SearchVechileDTO searchVechile)
+        {
+            try
+            {
+                if (searchVechile.StartDate >= searchVechile.EndDate)
+                {
+                    var temp = searchVechile.StartDate;
+                    searchVechile.StartDate = searchVechile.EndDate;
+                    searchVechile.EndDate = temp;
+                }
+                if (searchVechile.StartDate == searchVechile.EndDate)
+                    searchVechile.EndDate += TimeSpan.FromDays(1);
+                var bookedVehicleIds = await _db.Bookings
+                   .Where(b => (b.Status == "Pending" || b.Status == "Confirmed" || b.Status == "InProgress") &&
+                        b.StartDate < searchVechile.EndDate &&
+                        b.EndDate > searchVechile.StartDate)
+                   .Select(b => b.VehicleID)
+                   .Distinct()
+                   .ToListAsync();
+
+                var availableVehicles = await _db.Vehicles
+                    .Include(v => v.VehicleImages)
+                    .Where(v => !bookedVehicleIds.Contains(v.VehicleID))
+                    .Where(v => v.Status == "Available")
+                    .Select(v => new
+                    {
+                        v.VehicleID,
+                        v.Brand,
+                        v.Model,
+                        v.Type,
+                        v.DailyRate,
+                        IsAvaliableNow = v.Status == "Available",
+                        PrimaryImageURL = v.VehicleImages.FirstOrDefault(img => img.IsPrimary).ImageURL
+                    }).ToListAsync();
+                return Ok(availableVehicles);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    error = "Internal Server Error",
+                    message = "An error occurred while searching for vehicles: " + ex.Message
+                });
+            }
         }
 
         [HttpPost]

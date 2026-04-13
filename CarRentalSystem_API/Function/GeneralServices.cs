@@ -43,16 +43,5 @@ namespace CarRentalSystem_API.Function
                 Console.WriteLine("Failed to send email: " + ex.Message);
             }
         }
-        public static string CheckingOTP(string inputOTP, string actualOTP)
-        {
-            if (inputOTP == actualOTP)
-            {
-                return "OTP verified successfully.";
-            }
-            else
-            {
-                return "Invalid OTP. Please try again.";
-            }
-        }
     }
 }

@@ -1,23 +1,26 @@
-﻿using CarRentalSystem_API.DTO.UserDTO;
+﻿using CarRentalSystem_API.DTO.AuthTokenDTO;
+using CarRentalSystem_API.DTO.UserDTO;
 using CarRentalSystem_API.Function;
 using CarRentalSystem_API.Models;
 using CloudinaryDotNet;
-using Microsoft.AspNetCore.Mvc;
-using CarRentalSystem_API.Function;
-using Microsoft.EntityFrameworkCore;
-using Scrypt;
-using System.Security.Claims;
 using CloudinaryDotNet.Actions;
-using System.IdentityModel.Tokens.Jwt;
-using System.Text;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Newtonsoft.Json.Linq;
+using Scrypt;
+using System.Collections;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
-namespace CarRentalSystem_API.Controllers.AuthControllers
+namespace CarRentalSystem_API.Controllers.UserControllers
 {
     [ApiController]
-    [Route("api/[controller]/[action]")]
-    [Tags("Auth User Management")]
-    public class ManageUserController : Controller
+    [Route("api/user/authentication")]
+    [Tags("User Authentication")]
+    public class UserAuthenticationController : Controller
     {
         private readonly AppDbContext _db;
         private readonly IConfiguration _config;
@@ -25,30 +28,13 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
         private static string passwordPattern = @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$";
         private static string emailPattern = @"^.+@.+$";
         private static ScryptEncoder encoder = new ScryptEncoder();
-        public ManageUserController(AppDbContext db, IConfiguration config)
+        public UserAuthenticationController(AppDbContext db, IConfiguration config)
         {
             _db = db;
             _config = config;
+
         }
-        [HttpGet]
-        public async Task<IActionResult> GetAllUser()
-        {
-           var users = await _db.Users
-                .Where(u => u.Role == "User")
-                .Select(u => new
-                {
-                    u.UserID,
-                    u.UserName,
-                    u.Email,
-                    u.PhoneNumber,
-                    u.Status,
-                    u.DriverLicenseImage,
-                    u.DriverLicenseNumber
-                })
-                .ToListAsync();
-            return Ok(users);
-        }
-        [HttpGet]
+        [HttpGet("profile")]
         public async Task<IActionResult> UserProfile()
         {
             int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
@@ -68,65 +54,11 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     error = "User Not Found.",
                     message = $"User with ID {userID} not found."
                 });
-              
+
             }
             return Ok(user);
         }
-        // This is create user not authentication the email and password, just create user for admin
-        [HttpPost]
-        public async Task<IActionResult> CreateUserAdmin([FromBody] CreateUserDTO createUser)
-        {
-            if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.PhoneNumber.ToString(), phonePattern))
-            {
-                return BadRequest(new
-                {
-                    error = "Invalid Phone Number Format",
-                    message = "Invalid phone number format. Format: 01X-XXXXXXX"
-                });
-            }
-            if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.Password, passwordPattern))
-            {
-                return BadRequest(new
-                {
-                    error = "Invalid Password Format",
-                    message = "Password must be at least 8 characters long and include uppercase, lowercase, digit, and special character."
-                });
-            }
-
-            if (!System.Text.RegularExpressions.Regex.IsMatch(createUser.Email, emailPattern))
-            {
-                return BadRequest(new
-                {
-                    error = "Invalid Email Format",
-                    message = "Invalid email format."
-                });
-            }
-            var existingUser = await _db.Users.AnyAsync(u => u.Email == createUser.Email && u.PhoneNumber == createUser.PhoneNumber);
-            if (existingUser)
-            {
-                return BadRequest(new
-                {
-                    error = "User Already Exists",
-                    message = "A user with the same email and phone number already exists."
-                });
-            }
-            await _db.Users.AddAsync(new User
-            {
-                UserName = createUser.UserName,
-                Email = createUser.Email,
-                PhoneNumber = createUser.PhoneNumber,
-                Password = encoder.Encode(createUser.Password),
-                Status = "Active",
-                Role = "User"
-            });
-            await _db.SaveChangesAsync();
-            return Ok(new
-            {
-                message = "User created successfully.",
-                UserID = _db.Users.OrderByDescending(u => u.UserID).FirstOrDefault().UserID
-            });
-        }
-        [HttpPost]
+        [HttpPost("signup")]
         public async Task<IActionResult> SignUpUser([FromBody] SignUpDTO createUser)
         {
 
@@ -270,7 +202,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 return StatusCode(500, "User created but failed to send OTP email. Please contact support.");
             }
         }
-        [HttpPost]
+        [HttpPost("verifyotp")]
         public async Task<IActionResult> VerifyOTP([FromBody] VerifyOTPDTO verify)
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == verify.Email);
@@ -320,7 +252,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
-        [HttpPost]
+        [HttpPost("resendotp")]
         public async Task<IActionResult> ResendOTP([FromBody] EmailDTO email)
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == email.Email);
@@ -422,7 +354,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
-        [HttpPost]
+        [HttpPost("forgetpassword")]
         public async Task<IActionResult> ForgetPassword([FromBody] EmailDTO email)
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == email.Email);
@@ -516,7 +448,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
-        [HttpPost]
+        [HttpPost("resetpasswordverifyotp")]
         public async Task<IActionResult> ResetPasswordVerifyOTP([FromBody] VerifyOTPDTO verify)
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == verify.Email);
@@ -558,7 +490,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 }
             }
         }
-        [HttpPost]
+        [HttpPost("resetpassword")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPassword resetPassword)
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == resetPassword.Email);
@@ -588,79 +520,142 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 Email = user.Email
             });
         }
-        [HttpPost]
+        [AllowAnonymous]
+        [HttpPost("loginuser")]
         public async Task<IActionResult> LoginUser([FromBody] LoginDTO login)
         {
-            var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == login.Email);
-            if (user == null)
+            try
             {
-                return NotFound(new
+                var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == login.Email);
+                if (user == null)
                 {
-                    error = "User Not Found",
-                    message = "User not found."
-                });
-            }
+                    return NotFound(new
+                    {
+                        error = "User Not Found",
+                        message = "User not found."
+                    });
+                }
 
-            bool isPasswordValid = encoder.Compare(login.Password, user.Password);
-            if (!isPasswordValid)
-            {
-                return BadRequest(new
+                bool isPasswordValid = encoder.Compare(login.Password, user.Password);
+                if (!isPasswordValid)
                 {
-                    error = "Invalid Credentials",
-                    message = "Incorrect email or password. Please try again."
+                    return BadRequest(new
+                    {
+                        error = "Invalid Credentials",
+                        message = "Incorrect email or password. Please try again."
+                    });
+                }
+                if (user.Role == "Staff")
+                    return BadRequest(new
+                    {
+                        error = "Unauthorized Role",
+                        message = "Staff accounts cannot log in through this endpoint. Please use the staff portal."
+                    });
+                if (user.Status != "Active")
+                {
+                    return BadRequest(new
+                    {
+                        error = "Account Not Active",
+                        message = "Your account is not active. Please verify your email or contact support."
+                    });
+                }
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var key = Encoding.ASCII.GetBytes(_config["Jwt:Key"]);
+                var tokenDescriptor = new SecurityTokenDescriptor
+                {
+                    Subject = new ClaimsIdentity(new Claim[]
+                    {
+                    new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
+                    new Claim(ClaimTypes.Email, user.Email),
+                    new Claim(ClaimTypes.Role, user.Role)
+                    }),
+                    Expires = DateTime.Now.AddHours(1),
+                    SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature),
+                    Issuer = _config["Jwt:Issuer"],
+                    Audience = _config["Jwt:Audience"]
+                };
+
+                var rawToken = tokenHandler.CreateToken(tokenDescriptor);
+                var tokenString = tokenHandler.WriteToken(rawToken);
+                var refreshToken = Guid.NewGuid().ToString();
+
+                var token = new TokenActivity
+                {
+                    Time = DateTime.Now,
+                    Message = $"Token generated for user {user.Email} with role {user.Role}",
+                    Token = tokenString,
+                    AllowAccessToken = TimeSpan.FromHours(1).ToString(),
+                    AllowRefreshToken = refreshToken,
+                    UserID = user.UserID,
+                    Role = user.Role
+                };
+                await _db.TokenActivities.AddAsync(token);
+                await _db.SaveChangesAsync();
+                return Ok(new
+                {
+                    message = "Login successful.",
+                    Token = tokenString,
+                    UserID = user.UserID,
+                    Email = user.Email,
+                    Role = user.Role
                 });
             }
-            if(user.Role == "Staff")
-                return BadRequest(new
-                {
-                    error = "Unauthorized Role",
-                    message = "Staff accounts cannot log in through this endpoint. Please use the staff portal."
-                });
-            if (user.Status != "Active")
+            catch (Exception ex)
             {
-                return BadRequest(new
+                return StatusCode(500, new
                 {
-                    error = "Account Not Active",
-                    message = "Your account is not active. Please verify your email or contact support."
+                    error = "Login Failed",
+                    message = "An error occurred during login. Please try again later." + ex.Message
                 });
             }
+        }
+        [AllowAnonymous]
+        [HttpPost("refreshuser")]
+        public async Task<IActionResult> RefrenshToken([FromBody] RefreshTokenRequestDTO refreshToken)
+        {
+            var activity = await _db.TokenActivities.FirstOrDefaultAsync(t => t.AllowRefreshToken == refreshToken.RefreshToken && t.Token == refreshToken.AccessToken);
+            if (activity == null)
+                return BadRequest(new
+                {
+                    error = "Invalid refresh token",
+                    message = "The provided refresh token is invalid or does not match the access token."
+                });
+            if (activity.Time.AddDays(7) < DateTime.Now)
+                return BadRequest(new
+                {
+                    error = "Refresh token expired",
+                    message = "The provided refresh token has expired. Please log in again."
+                });
+
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(_config["Jwt:Key"]);
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(new Claim[]
                 {
-                    new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
-                    new Claim(ClaimTypes.Email, user.Email),
-                    new Claim(ClaimTypes.Role, user.Role)
+                    new Claim(ClaimTypes.NameIdentifier, activity.UserID?.ToString() ?? "0"),
+                    new Claim(ClaimTypes.Role, activity.Role)
                 }),
-                Expires = DateTime.Now.AddDays(1),
+                Expires = DateTime.Now.AddHours(1),
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature),
                 Issuer = _config["Jwt:Issuer"],
                 Audience = _config["Jwt:Audience"]
             };
-            var rawtoken = tokenHandler.CreateToken(tokenDescriptor);
-            var tokenString = tokenHandler.WriteToken(rawtoken);
-            _db.TokenActivities.Add(new TokenActivity
-            {
-                Time = DateTime.Now,
-                Message = $"Token generated for user {user.Email} with role {user.Role}",
-                Token = tokenString,
-                AllowAccessToken = TimeSpan.FromDays(1).ToString(),
-                UserID = user.UserID,
-                Role = user.Role,
-            });
+            var newAccessToken = tokenHandler.WriteToken(tokenHandler.CreateToken(tokenDescriptor));
+            var newRefreshToken = Guid.NewGuid().ToString("N");
+
+            activity.Token = newAccessToken;
+            activity.AllowRefreshToken = newRefreshToken;
+            activity.Time = DateTime.Now;
             await _db.SaveChangesAsync();
             return Ok(new
             {
-                message = "Login successful.",
-                Token = tokenString,
-                UserID = user.UserID,
-                Email = user.Email,
-                Role = user.Role
+                token = newAccessToken,
+                refreshToken = newRefreshToken,
+                expiresIn = TimeSpan.FromHours(1).TotalSeconds
             });
         }
-        [HttpPost]
+        [HttpPost ("updateprofile")]
         public async Task<IActionResult> UpdateUser([FromBody] UpdateUserDTO updateUser)
         {
             int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
@@ -719,11 +714,11 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 PhoneNumber = user.PhoneNumber
             });
         }
-        [HttpPost]
+        [HttpPost ("changepassword")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePassword changePassword)
         {
             int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
-            if (userID == 0) 
+            if (userID == 0)
                 return BadRequest(new
                 {
                     error = "Invalid User ID",
@@ -765,7 +760,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 Email = user.Email
             });
         }
-        [HttpPost]
+        [HttpPost ("uploadlicense")]
         public async Task<IActionResult> UploadDriveInformation([FromForm] UploadLicenseInfoDTO uploadLicense)
         {
             try
@@ -785,7 +780,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                         error = "User Not Found",
                         message = "User not found."
                     });
-                if(!System.Text.RegularExpressions.Regex.IsMatch(uploadLicense.DriverLicenseNumber, IcPattern))
+                if (!System.Text.RegularExpressions.Regex.IsMatch(uploadLicense.DriverLicenseNumber, IcPattern))
                 {
                     return BadRequest(new
                     {
@@ -804,7 +799,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
 
                 var allowedExtensions = new[] { ".jpg", ".jpeg", ".png" };
                 var ext = Path.GetExtension(uploadLicense.DriverLicenseImage.FileName).ToLowerInvariant();
-                if(!allowedExtensions.Contains(ext))
+                if (!allowedExtensions.Contains(ext))
                 {
                     return BadRequest(new
                     {
@@ -821,7 +816,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 cloudinary.Api.Secure = true;
 
                 var uploadFolder = new ImageUploadResult();
-                using(var stream = uploadLicense.DriverLicenseImage.OpenReadStream())
+                using (var stream = uploadLicense.DriverLicenseImage.OpenReadStream())
                 {
                     var uploadParams = new ImageUploadParams()
                     {
@@ -860,7 +855,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             }
 
         }
-        [HttpPost("{id}/toggle-status")]
+        [HttpPost ("toggleuserstatus/{id}")]
         public async Task<IActionResult> ToggleUserStatus(int id)
         {
             var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.UserID == id);
@@ -882,10 +877,10 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 NewStatus = existingUser.Status
             });
         }
-        [HttpPost]
-        public async Task<IActionResult> UserLogout()
+        [HttpPost("logoutuser")]
+        public async Task<IActionResult> LogoutUser()
         {
-            int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
             if (userID == 0)
             {
                 return BadRequest(new
@@ -894,75 +889,22 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     message = "User ID is missing or invalid."
                 });
             }
-            var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == userID);
+            var user = await _db.Users.FindAsync(userID);
             if (user == null)
             {
                 return NotFound(new
                 {
                     error = "User Not Found",
-                    message = "User not found."
+                    message = $"User with ID {userID} not found."
                 });
             }
-            var userToken = await _db.TokenActivities.Where(t => t.UserID == userID && t.Role == user.Role && t.Token != null).ToListAsync();
-            userToken.ForEach(t => t.Token = $"This token is invalid as the user logged out at {DateTime.Now}");
+            var token = await _db.TokenActivities.Where(x => x.UserID == userID && x.Role == user.Role && x.Token != null).ToListAsync();
+            token.ForEach(x => x.Token = $"This token is invalidated at {DateTime.Now}. User logged out.");
             await _db.SaveChangesAsync();
             return Ok(new
             {
-                message = "Logout successful. All active tokens for this user have been invalidated.",
-                UserID = user.UserID,
-                Email = user.Email
-            });
-        }
-        // This is user delete that will be used for user self-deletion. It will set the user status to "Deactivated" and anonymize the email and phone number. The user can no longer log in or use the account, but the data is kept for record-keeping and potential reactivation.
-        [HttpPost]
-        public async Task<IActionResult> UserDowngrade()
-        {
-            int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
-            if (userID == 0)
-            {
-                return BadRequest(new
-                {
-                    error = "Invalid User ID",
-                    message = "User ID is missing or invalid."
-                });
-            }
-            var user = await _db.Users.FirstOrDefaultAsync(x => x.UserID == userID);
-            if(user == null) 
-                return NotFound(new
-                {
-                    error = "User Not Found",
-                    message = "User not found."
-                });
-            user.Status = "Deactivated";
-            user.Email = $"User{user.UserID}_{Guid.NewGuid()}@example.com";
-            user.PhoneNumber = $"000-0000000";
-            await _db.SaveChangesAsync();
-            return Ok(new
-            {
-                message = "Account downgraded successfully. Your account is now deactivated and your email and phone number have been anonymized.",
-                UserID = user.UserID,
-                NewStatus = user.Status
-            });
-        }
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteUser(int id)
-        {
-            var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.UserID == id && u.Role != "Staff" && (u.Status == "Deactivated" || u.Status == "Inactive"));
-            if (existingUser == null)
-            {
-                return NotFound(new
-                {
-                    error = "User Not Found",
-                    message = $"User with ID {id} not found."
-                });
-            }
-            _db.Users.Remove(existingUser);
-            await _db.SaveChangesAsync();
-            return Ok(new
-            {
-                message = "User deleted successfully.",
-                UserID = existingUser.UserID,
-                Email = existingUser.Email
+                message = "Logout Successful",
+                Details = "Your session has been successfully terminated. All active tokens have been invalidated. Please log in again to access your account."
             });
         }
     }

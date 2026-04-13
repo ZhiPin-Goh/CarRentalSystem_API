@@ -27,7 +27,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             var activePromotions = await _db.Promotions
                 .Where(p => p.IsActive && p.StartDate <= DateTime.Now && p.EndDate >= DateTime.Now)
                 .ToListAsync();
-           
+
             return Ok(activePromotions);
         }
         [HttpPost]
@@ -46,24 +46,54 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     error = "Invalid Date Range",
                     message = "Start date must be before end date."
                 });
-            if (createPromotion.DiscountPercentage <= 0 || createPromotion.DiscountPercentage > 100)
-                return BadRequest(new
+            if(createPromotion.DiscountPercentage <= 0 || createPromotion.DiscountPercentage > 100)
+                return  BadRequest(new
                 {
                     error = "Invalid Discount Percentage",
                     message = "Discount percentage must be between 0 and 100."
                 });
             if(createPromotion.MaxDiscountAmount != null)
-            {
                 if (createPromotion.MaxDiscountAmount <= 0)
                     return BadRequest(new
                     {
                         error = "Invalid Max Discount Amount",
                         message = "Max discount amount must be greater than 0."
                     });
-            }
-            else 
-                createPromotion.MaxDiscountAmount = null;
 
+            string promtionScopeValues = createPromotion.PromotionScope;
+            switch (createPromotion.PromotionScope)
+            {
+                case "Global": // No additional validation needed for global scope
+                    createPromotion.TargetValue = null;
+                    createPromotion.ApplicableModel = null;
+                    break;
+                case "ModelSpecific": // Vehicle model specific promotion
+                    if (string.IsNullOrWhiteSpace(createPromotion.ApplicableModel))
+                        return BadRequest(new { error = "Missing Model", message = "Applicable model must be specified." });
+                    var existingModel = await _db.Vehicles.AnyAsync(m => m.Model.ToLower() == createPromotion.ApplicableModel.ToLower());
+                    if (!existingModel)
+                        return BadRequest(new
+                        {
+                            error = "Invalid Model",
+                            message = $"No vehicle model found matching '{createPromotion.ApplicableModel}'."
+                        });
+                    createPromotion.TargetValue = null;
+                    break;
+                case "MinSpend": // Minimum spend promotion
+                    if (createPromotion.TargetValue == null || createPromotion.TargetValue <= 0)
+                        return BadRequest(new
+                        {
+                            error = "Invalid Target Value",
+                            message = "Target value must be specified and greater than 0 for MinSpend promotion scope."
+                        });
+                    createPromotion.ApplicableModel = null;
+                    break;
+                default:
+                    promtionScopeValues = "Global";
+                    createPromotion.TargetValue = null;
+                    createPromotion.ApplicableModel = null;
+                    break;
+            }
             var promotion = new Promotion
             {
                 Name = createPromotion.Name,
@@ -73,10 +103,11 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 StartDate = createPromotion.StartDate,
                 EndDate = createPromotion.EndDate,
                 IsActive = true,
-                PromotionScope = string.IsNullOrEmpty(createPromotion.PromotionScope) ? "All" : createPromotion.PromotionScope,
-                TargetValue = string.IsNullOrEmpty(createPromotion.TargetValue) ? null : createPromotion.TargetValue
+                PromotionScope = promtionScopeValues,
+                TargetValue = createPromotion.TargetValue,
+                ApplicableModel = createPromotion.ApplicableModel
             };
-            _db.Promotions.Add(promotion);
+            await _db.Promotions.AddAsync(promotion);
             await _db.SaveChangesAsync();
             return Ok(new
             {
@@ -94,26 +125,13 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     error = "Promotion Not Found",
                     message = $"Promotion with ID {updatePromotion.PromotionID} not found."
                 });
-            if (updatePromotion.StartDate >= updatePromotion.EndDate)
+            if (updatePromotion.EndDate <= DateTime.UtcNow || updatePromotion.EndDate <= existingPromotion.StartDate)
                 return BadRequest(new
                 {
-                    error = "Invalid Date Range",
-                    message = "Start date must be before end date."
+                    error = "Invalid End Date",
+                    message = "End date must be in the future and after the start date."
                 });
-            if (updatePromotion.DiscountPercentage <= 0 || updatePromotion.DiscountPercentage > 100)
-                return BadRequest(new
-                {
-                    error = "Invalid Discount Percentage",
-                    message = "Discount percentage must be between 0 and 100."
-                });
-            if (updatePromotion.MaxDiscountAmount != null)
-                if (updatePromotion.MaxDiscountAmount <= 0)
-                    return BadRequest(new
-                    {
-                        error = "Invalid Max Discount Amount",
-                        message = "Max discount amount must be greater than 0."
-                    });
-                
+
             _db.Entry(existingPromotion).CurrentValues.SetValues(updatePromotion);
             await _db.SaveChangesAsync();
             return Ok(new

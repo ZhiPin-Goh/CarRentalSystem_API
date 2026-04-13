@@ -24,22 +24,26 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
             _config = config;
 
         }
-        [HttpGet]
+        [HttpGet("vehicles")]
         public async Task<IActionResult> GetAllVehicle()
         {
             var vehicles = await _db.Vehicles
-                .Include(v => v.VehicleImages)
-                .ToListAsync();
+                  .Include(x => x.VehicleImages)
+                  .Select(v => new
+                  {
+                      v.VehicleID,
+                      v.Brand,
+                      v.Model,
+                      v.Year,
+                      v.LicensePlate,
+                      v.DailyRate,
+                      v.Status,
+                      v.Type,
+                      v.FuelType,
+                      v.SpecsInfo,
+                      PrimaryImageURL = v.VehicleImages.Where(img => img.IsPrimary).Select(img => img.ImageURL).FirstOrDefault()
+                  }).ToListAsync();
             return Ok(vehicles);
-        }
-        [HttpGet]
-        public async Task<IActionResult> GetAvailableVehicle()
-        {
-                var availableVehicles = await _db.Vehicles
-                    .Where(v => v.Status == "Available")
-                    .Include(v => v.VehicleImages)
-                    .ToListAsync();
-            return Ok(availableVehicles);
         }
         [HttpPost ("createvehicle")]
         public async Task<IActionResult> CreateVehicle([FromForm] CreateVehicleDTO vehicleDTO)
