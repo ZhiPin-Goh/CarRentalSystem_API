@@ -4,6 +4,5 @@
     {
         public int BookingID { get; set; }
         public DateTime NewEndDate { get; set; }
-        public string PaymentMethod { get; set; }
     }
 }

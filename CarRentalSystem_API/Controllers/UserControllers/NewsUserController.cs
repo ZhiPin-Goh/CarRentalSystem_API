@@ -16,7 +16,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
         {
             _db = db;
         }
-        [HttpGet ("news")]  
+        [HttpGet("news")]
         public async Task<IActionResult> GetPublishedNews()
         {
             var news = await _db.News.Where(x => x.IsPublished == true)
@@ -25,7 +25,10 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                     x.NewsID,
                     x.Title,
                     x.Content,
-                    x.PublishedDate
+                    x.PublishedDate,
+                    x.Summary,
+                    x.CoverImageURL,
+                    x.Author
                 }).ToListAsync();
 
             return Ok(news);

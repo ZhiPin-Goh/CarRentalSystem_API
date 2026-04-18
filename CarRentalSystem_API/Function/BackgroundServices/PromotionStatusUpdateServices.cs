@@ -15,28 +15,31 @@ namespace CarRentalSystem_API.Function.BackgroundServices
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                using(var scope = _serviceProvider.CreateScope())
+                try
                 {
-                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    var expiredPromotions = await db.Promotions
-                        .Where(p => p.EndDate < DateTime.Now && p.IsActive == true)
-                        .ToListAsync(stoppingToken);
-                    foreach(var promotion in expiredPromotions)
+                    using (var scope = _serviceProvider.CreateScope())
                     {
-                        promotion.IsActive = false;
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var expiredPromotions = await db.Promotions
+                            .Where(p => p.EndDate < DateTime.Now && p.IsActive == true)
+                            .ToListAsync(stoppingToken);
+                        foreach (var promotion in expiredPromotions)
+                        {
+                            promotion.IsActive = false;
+                        }
+                        await db.SaveChangesAsync(stoppingToken);
+                        _logger.LogInformation("Promotion status updated successfully at {time}", DateTimeOffset.Now);
                     }
-                    await db.SaveChangesAsync(stoppingToken);
-                    _logger.LogInformation("Promotion status updated successfully at {time}", DateTimeOffset.Now);
-                }
 
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "An error occurred while updating promotion status at {time}", DateTimeOffset.Now);
+                }
+                await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An error occurred while updating promotion status at {time}", DateTimeOffset.Now);
-            }
-            await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
         }
     }
 }

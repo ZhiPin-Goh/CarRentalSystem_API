@@ -3,6 +3,6 @@
     public class UploadLicenseInfoDTO
     {
         public string DriverLicenseNumber { get; set; }
-        public FormFile DriverLicenseImage { get; set; }
+        public IFormFile DriverLicenseImage { get; set; }
     }
 }

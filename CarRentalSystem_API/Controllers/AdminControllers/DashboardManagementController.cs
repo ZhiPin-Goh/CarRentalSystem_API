@@ -17,7 +17,6 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
             _db = db;
         }
         [HttpGet("overview")]
-        [HttpGet]
         public async Task<IActionResult> GetSummary()
         {
             var today = DateTime.Now;

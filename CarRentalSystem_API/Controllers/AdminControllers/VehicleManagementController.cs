@@ -45,6 +45,35 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
                   }).ToListAsync();
             return Ok(vehicles);
         }
+        [HttpGet("/getvehicle/{vehicleID}")]
+        public async Task<IActionResult> GetVehicle(int vehicleID)
+        {
+            var vehicle = await _db.Vehicles
+                .Include(v => v.VehicleImages)
+                .Where(v => v.VehicleID == vehicleID)
+                .Select(v => new
+                {
+                    v.VehicleID,
+                    v.Brand,
+                    v.Model,
+                    v.Year,
+                    v.LicensePlate,
+                    v.DailyRate,
+                    v.Status,
+                    v.Type,
+                    v.FuelType,
+                    v.SpecsInfo,
+                    PrimaryImageURL = v.VehicleImages.FirstOrDefault(img => img.IsPrimary).ImageURL,
+                    AdditionalImageURLs = v.VehicleImages.Where(img => !img.IsPrimary).Select(img => img.ImageURL).ToList()
+                }).FirstOrDefaultAsync();
+            if (vehicle == null)
+                return NotFound(new
+                {
+                    error = "Vehicle Not Found",
+                    message = $"No vehicle found with ID {vehicleID}. Please check the ID and try again."
+                });
+            return Ok(vehicle);
+        }
         [HttpPost ("createvehicle")]
         public async Task<IActionResult> CreateVehicle([FromForm] CreateVehicleDTO vehicleDTO)
         {

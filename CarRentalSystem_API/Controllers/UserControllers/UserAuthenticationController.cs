@@ -490,7 +490,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 }
             }
         }
-        [HttpPost("resetpassword")]
+        [HttpPost(" ")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPassword resetPassword)
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == resetPassword.Email);
@@ -855,28 +855,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
             }
 
         }
-        [HttpPost ("toggleuserstatus/{id}")]
-        public async Task<IActionResult> ToggleUserStatus(int id)
-        {
-            var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.UserID == id);
-            if (existingUser == null)
-            {
-                return NotFound(new
-                {
-                    error = "User Not Found",
-                    message = $"User with ID {id} not found."
-                });
-            }
-            existingUser.Status = existingUser.Status == "Active" ? "Inactive" : "Active";
-            _db.Entry(existingUser).State = EntityState.Modified;
-            await _db.SaveChangesAsync();
-            return Ok(new
-            {
-                message = $"User status changed to {existingUser.Status} successfully.",
-                UserID = existingUser.UserID,
-                NewStatus = existingUser.Status
-            });
-        }
+       
         [HttpPost("logoutuser")]
         public async Task<IActionResult> LogoutUser()
         {
