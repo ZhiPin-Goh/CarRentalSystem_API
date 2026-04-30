@@ -25,7 +25,7 @@ builder.Services.AddSwaggerGen(x =>
 {
     x.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "Car Rental ystem API",
+        Title = "Car Rental System API",
         Version = "v1",
     });
     x.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme

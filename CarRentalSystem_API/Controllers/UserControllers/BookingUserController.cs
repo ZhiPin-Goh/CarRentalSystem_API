@@ -1,4 +1,5 @@
 ﻿using CarRentalSystem_API.DTO.BookingDTO;
+using CarRentalSystem_API.Function;
 using CarRentalSystem_API.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -57,7 +58,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
             }
             return Ok(unavailableDates);
         }
-        [HttpGet ("progress")]
+        [HttpGet("progress")]
         public async Task<IActionResult> GetBookingProgress()
         {
             int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
@@ -74,7 +75,38 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 .ToListAsync();
             return Ok(bookings);
         }
-        [HttpPost ("createbooking")]
+        [HttpGet("pending/{bookingID}")]
+        public async Task<IActionResult> GetPendingPayment(int bookingID)
+        {
+            int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            var existingUser = await _db.Users.AnyAsync(x => x.UserID == userID);
+            if (!existingUser)
+                return NotFound(new
+                {
+                    error = "User not found",
+                    message = $"No user found with ID {userID}"
+                });
+            var booking = await _db.Bookings
+                .Include(x => x.Vehicle)
+                .FirstOrDefaultAsync(x => x.UserID == userID && x.BookingID == bookingID && x.Status == "Pending");
+            if (booking == null)
+                return NotFound(new
+                {
+                    error = "Booking not found",
+                    message = $"No pending booking found with ID {bookingID} for the user"
+                });
+            var pendingObj = new
+            {
+                BookingID = booking.BookingID,
+                Brand = booking.Vehicle.Brand,
+                Model = booking.Vehicle.Model,
+                StartDate = booking.StartDate,
+                EndDate = booking.EndDate,
+                TotalAmount = booking.FinalPaidAmount
+            };
+            return Ok(pendingObj);
+        }
+        [HttpPost("createbooking")]
         public async Task<IActionResult> CreateBooking([FromBody] CreateBookingDTO createBooking)
         {
             int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
@@ -256,7 +288,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 Text = $"Booking created successfully. Total price: {calculatedTotalPrice:C}, Discount: {discountAmount:C}, Final amount to pay: {finalPaidAmount:C}"
             });
         }
-        [HttpPost ("processpayment/{bookingid}")]
+        [HttpPost("processpayment/{bookingid}")]
         public async Task<IActionResult> ProcessPayment(int bookingid)
         {
             var existingBooking = await _db.Bookings.FirstOrDefaultAsync(x => x.BookingID == bookingid);
@@ -269,6 +301,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
             using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
+                int totalDays = (existingBooking.EndDate - existingBooking.StartDate).Days;
                 existingBooking.Status = "Confirmed";
 
                 var transactionRecord = new Transaction
@@ -277,11 +310,21 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                     Amount = existingBooking.FinalPaidAmount,
                     TransactionDate = DateTime.Now,
                     Type = "Payment New Booking",
+                    PaymentMethod = "Credit Card",
+                    TransactionCode = GeneralServices.GenerateNumber(10),
                     Status = "Completed"
                 };
                 _db.Transactions.Add(transactionRecord);
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
+                await GeneralServices.InvoicePdf(
+                    username: existingBooking.User.UserName,
+                    email: existingBooking.User.Email,
+                    vehicleAmount: existingBooking.FinalPaidAmount,
+                    transactionCode: transactionRecord.TransactionCode,
+                    totalDate: totalDays,
+                    vehicleName: $"{existingBooking.Vehicle.Brand} {existingBooking.Vehicle.Model}"
+                    );
                 return Ok(new
                 {
                     message = "Payment processed successfully",
@@ -305,7 +348,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 await transaction.DisposeAsync();
             }
         }
-        [HttpPost ("extendbooking")]
+        [HttpPost("extendbooking")]
         public async Task<IActionResult> ExtendBooking([FromBody] ExtendBookingDTO extendBooking)
         {
             var existingBooking = await _db.Bookings.FirstOrDefaultAsync(x => x.BookingID == extendBooking.BookingID);
@@ -341,18 +384,22 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                     error = "Date conflict",
                     message = "The new end date conflicts with another booking for the same vehicle"
                 });
+            int extraDays = (extendBooking.NewDateTime - existingBooking.EndDate).Days;
+            decimal extraCost = extraDays * existingBooking.Vehicle.DailyRate;
             return Ok(new
             {
                 message = "Booking can be extended",
                 BookingID = existingBooking.BookingID,
                 CurrentEndDate = existingBooking.EndDate,
-                NewEndDate = extendBooking.NewDateTime
+                NewEndDate = extendBooking.NewDateTime,
+                ExtraDays = extraDays,
+                ExtraCost = extraCost,
             });
         }
-        [HttpPost ("processextensionpayment")]
+        [HttpPost("processextensionpayment")]
         public async Task<IActionResult> ProcessExtensionPayment([FromBody] ExtendPaymentDTO extendPayment)
         {
-            var booking = await _db.Bookings.Include(x => x.Vehicle).FirstOrDefaultAsync(x => x.BookingID == extendPayment.BookingID);
+            var booking = await _db.Bookings.Include(x => x.Vehicle).Include(x => x.User).FirstOrDefaultAsync(x => x.BookingID == extendPayment.BookingID);
             if (booking == null)
                 return NotFound(new
                 {
@@ -361,6 +408,8 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 });
             int extraDays = (extendPayment.NewEndDate - booking.EndDate).Days;
             decimal extraCost = extraDays * booking.Vehicle.DailyRate;
+
+            DateTime oldEndDate = booking.EndDate;
             using var dBtransaction = await _db.Database.BeginTransactionAsync();
             try
             {
@@ -379,6 +428,18 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 booking.IsExtended = true;
                 await _db.SaveChangesAsync();
                 await dBtransaction.CommitAsync();
+
+
+                //use Task.Run to generate and send the invoice email in the background without blocking the main thread
+                _ = Task.Run(() => GeneralServices.ExtensionInvoicePdf(
+                    username: booking.User.UserName,
+                    email: booking.User.Email,
+                    transactionCode: transaction.TransactionID.ToString(),
+                    vehicleName: booking.Vehicle.Model,
+                    dailyRate: booking.Vehicle.DailyRate,
+                    oldEndDate: oldEndDate, 
+                    newEndDate: extendPayment.NewEndDate
+                    ));
                 return Ok(new
                 {
                     message = "Extension payment processed successfully",
@@ -404,7 +465,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 await dBtransaction.DisposeAsync();
             }
         }
-        [HttpPost ("cancelbooking/{bookingid}")]
+        [HttpPost("cancelbooking/{bookingid}")]
         public async Task<IActionResult> CancelBooking(int bookingid)
         {
             var existingBooking = await _db.Bookings.FirstOrDefaultAsync(x => x.BookingID == bookingid);
