@@ -8,7 +8,6 @@ namespace CarRentalSystem_API.Controllers.UserControllers
     [Route("api/user/banners")]
     [ApiController]
     [Tags("User Banners")]
-    [Authorize(Roles = "User")]
     public class BannersUserController : Controller
     {
         private readonly AppDbContext _db;

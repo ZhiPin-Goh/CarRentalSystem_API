@@ -19,7 +19,7 @@ namespace CarRentalSystem_API.Function
         {
             try
             {
-                string senderEmail = "ZhiPin0512@student.eduvoacademy.edu.my";
+                string senderEmail = "gohzp1227@gmail.com";
                 string senderDisplayName = "Drive Link";
 
                 MailAddress fromAddress = new MailAddress(senderEmail, senderDisplayName);
@@ -33,11 +33,11 @@ namespace CarRentalSystem_API.Function
                     IsBodyHtml = true
                 };
 
-                SmtpClient client = new SmtpClient("smtp.office365.com", 587)
+                SmtpClient client = new SmtpClient("smtp.gmail.com", 587)
                 {
                     EnableSsl = true,
                     UseDefaultCredentials = false,
-                    Credentials = new System.Net.NetworkCredential(senderEmail, "Goh1227@@@")
+                    Credentials = new System.Net.NetworkCredential(senderEmail, "vooeszhogwzzrhoj")
                 };
 
                 // 发送邮件
@@ -52,7 +52,7 @@ namespace CarRentalSystem_API.Function
         {
             try
             {
-                string senderEmail = "ZhiPin0512@student.eduvoacademy.edu.my";
+                string senderEmail = "gohzp1227@gmail.com";
                 string senderDisplayName = "Drive Link";
 
                 MailAddress fromAddress = new MailAddress(senderEmail, senderDisplayName);
@@ -69,11 +69,11 @@ namespace CarRentalSystem_API.Function
                 using MemoryStream pdfStream = new MemoryStream(pdfBytes);
                 msg.Attachments.Add(new Attachment(pdfStream, fileName, "application/pdf"));
 
-                using SmtpClient client = new SmtpClient("smtp.office365.com", 587)
+                using SmtpClient client = new SmtpClient("smtp.gmail.com", 587)
                 {
                     EnableSsl = true,
                     UseDefaultCredentials = false,
-                    Credentials = new System.Net.NetworkCredential(senderEmail, "Goh1227@@@")
+                    Credentials = new System.Net.NetworkCredential(senderEmail, "vooeszhogwzzrhoj")
                 };
                 await client.SendMailAsync(msg);
             }
@@ -259,6 +259,90 @@ namespace CarRentalSystem_API.Function
             catch (Exception ex)
             {
                 Console.WriteLine("Failed to send email: " + ex.Message);
+            }
+        }
+        public static async Task CancelReceiptPdf(string username, string email, string transactionCode, string vehicleName, decimal originalAmount, decimal refundAmount)
+        {
+            QuestPDF.Settings.License = LicenseType.Community;
+            decimal penaltyAmount = originalAmount - refundAmount;
+            var invoiceNo = $"CNCL-{DateTime.Now:yyyy-MM-dd}-{GenerateNumber(4)}";
+
+            byte[] pdfBytes = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(2, Unit.Centimetre);
+                    page.DefaultTextStyle(x => x.FontSize(12));
+
+                    //Header
+                    page.Header().Row(row => {
+                        row.RelativeItem().Column(col => {
+                            col.Item().Text("Drive Link").SemiBold().FontSize(30).FontColor("#dc2626");
+                            col.Item().Text("Cancellation Receipt / Credit Note").FontSize(14).Italic();
+                        });
+                        row.ConstantItem(150).Column(col => {
+                            col.Item().Text($"Receipt No: {invoiceNo}").Bold();
+                            col.Item().Text($"Date: {DateTime.Now:dd MMM yyyy}");
+                        });
+                    });
+
+                    // Body
+                    page.Content().PaddingVertical(1, Unit.Centimetre).Column(col =>
+                    {
+                        col.Spacing(10);
+                        col.Item().Text($"Bill To: {username}").Bold();
+                        col.Item().Text($"Email: {email}");
+                        col.Item().LineHorizontal(1);
+
+                        col.Item().Text("Order Summary").FontSize(16).SemiBold();
+                        col.Item().Text($"Vehicle: {vehicleName}");
+                        col.Item().Text($"Status: Cancelled").FontColor("#dc2626").Bold();
+
+                        col.Item().PaddingTop(15).Text("Refund Details").FontSize(16).SemiBold();
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(c => {
+                                c.RelativeColumn(3);
+                                c.RelativeColumn(1); 
+                            });
+
+                            table.Header(h => {
+                                h.Cell().BorderBottom(1).PaddingBottom(5).Text("Description").Bold();
+                                h.Cell().BorderBottom(1).PaddingBottom(5).AlignRight().Text("Amount").Bold();
+                            });
+
+                            table.Cell().PaddingVertical(5).Text("Total Amount Paid (Original)");
+                            table.Cell().PaddingVertical(5).AlignRight().Text($"RM {originalAmount:F2}");
+
+                            if (penaltyAmount > 0)
+                            {
+                                table.Cell().PaddingVertical(5).Text("Cancellation Penalty / Fee").FontColor("#dc2626");
+                                table.Cell().PaddingVertical(5).AlignRight().Text($"- RM {penaltyAmount:F2}").FontColor("#dc2626");
+                            }
+
+                            table.Cell().BorderTop(1).PaddingVertical(10).Text("Approved Refund Amount:").Bold().FontSize(14);
+                            table.Cell().BorderTop(1).PaddingVertical(10).AlignRight().Text($"RM {refundAmount:F2}").Bold().FontSize(14).FontColor("#16a34a");
+                        });
+
+                        col.Item().PaddingTop(20).Text("* Refund process has been initiated. Please allow 3-5 business days for the funds to reflect in your original payment method.").FontSize(10).Italic();
+                    });
+
+                    page.Footer().AlignCenter().Text(x => {
+                        x.Span("Cancellation Receipt for Transaction: ");
+                        x.Span(transactionCode).Bold();
+                    });
+                });
+
+            }).GeneratePdf();
+
+            try
+            {
+                await SendEmailPdf(email, $"Cancellation Receipt: {vehicleName}", "Your booking has been cancelled. Please find the cancellation receipt attached.", pdfBytes, $"{invoiceNo}.pdf");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to send email: {ex.Message}");
             }
         }
     }

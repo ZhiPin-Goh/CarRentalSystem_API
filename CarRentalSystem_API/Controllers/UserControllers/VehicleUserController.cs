@@ -7,9 +7,8 @@ using Microsoft.EntityFrameworkCore;
 namespace CarRentalSystem_API.Controllers.UserControllers
 {
     [ApiController]
-    [Route("api/user/vehicle")]
+    [Route("api/user/vehicles")]
     [Tags("User Vehicle Management")]
-    [Authorize(Roles = "User")]
     public class VehicleUserController : Controller
     {
         private readonly AppDbContext _db;
@@ -24,7 +23,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
             var vehicles = await _db.Vehicles
                 .Where(v => v.Status == "Available" || v.Status == "Rented")
                 .Include(v => v.VehicleImages)
-                .Take(6)
+                .Take(10)
                 .Select(v => new
                 {
                     v.VehicleID,
@@ -153,6 +152,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
         }
         [HttpGet("search")]
         public async Task<IActionResult> SearchVehicle(
+            [FromQuery] string searchName,
             [FromQuery] string? brand,
             [FromQuery] string? type,
             [FromQuery] decimal? maxPrice,
@@ -162,7 +162,11 @@ namespace CarRentalSystem_API.Controllers.UserControllers
             try
             {
                 IQueryable<Vehicle> query = _db.Vehicles.Include(v => v.VehicleImages);
-                if(startDate.HasValue && endDate.HasValue)
+                if (!string.IsNullOrEmpty(searchName))
+                {
+                    query = query.Where(v => v.Brand.Contains(searchName) || v.Model.Contains(searchName));
+                }
+                if (startDate.HasValue && endDate.HasValue)
                 {
                     if (startDate.Value >= endDate.Value)
                     {

@@ -8,7 +8,6 @@ namespace CarRentalSystem_API.Controllers.UserControllers
     [ApiController]
     [Route("api/user/news")]
     [Tags("User News Management")]
-    [Authorize(Roles = "User")]
     public class NewsUserController : Controller
     {
         private readonly AppDbContext _db;

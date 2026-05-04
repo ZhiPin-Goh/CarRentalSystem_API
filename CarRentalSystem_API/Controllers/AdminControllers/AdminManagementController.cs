@@ -146,6 +146,7 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
                 });
             activity.Token = $"Token invalidated at {DateTime.Now}";
             activity.AllowRefreshToken = $"Token invalidated at {DateTime.Now}";
+            activity.Message = $"Token invalidated for role: {activity.Role}";
             await _db.SaveChangesAsync();
             return Ok(new
             {

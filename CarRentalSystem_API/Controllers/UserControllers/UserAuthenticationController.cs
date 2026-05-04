@@ -34,6 +34,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
             _config = config;
 
         }
+        [Authorize(Roles = "User")]
         [HttpGet("profile")]
         public async Task<IActionResult> UserProfile()
         {
@@ -87,7 +88,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 });
             }
             string otp = GeneralServices.GenerateNumber(6);
-            var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == createUser.Email && u.PhoneNumber == createUser.PhoneNumber);
+            var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.Email == createUser.Email || u.PhoneNumber == createUser.PhoneNumber);
             if (existingUser != null)
             {
                 if (existingUser.Status == "Active")
@@ -490,7 +491,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 }
             }
         }
-        [HttpPost(" ")]
+        [HttpPost("resetpassword")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPassword resetPassword)
         {
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == resetPassword.Email);
@@ -595,6 +596,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 {
                     message = "Login successful.",
                     Token = tokenString,
+                    RefreshToken = refreshToken,
                     UserID = user.UserID,
                     Email = user.Email,
                     Role = user.Role
@@ -655,7 +657,8 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 expiresIn = TimeSpan.FromHours(1).TotalSeconds
             });
         }
-        [HttpPost ("updateprofile")]
+        [Authorize(Roles = "User")]
+        [HttpPost("updateprofile")]
         public async Task<IActionResult> UpdateUser([FromBody] UpdateUserDTO updateUser)
         {
             int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
@@ -714,7 +717,8 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 PhoneNumber = user.PhoneNumber
             });
         }
-        [HttpPost ("changepassword")]
+        [Authorize(Roles = "User")]
+        [HttpPost("changepassword")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePassword changePassword)
         {
             int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
@@ -760,7 +764,8 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 Email = user.Email
             });
         }
-        [HttpPost ("uploadlicense")]
+        [Authorize(Roles = "User")]
+        [HttpPost("uploadlicense")]
         public async Task<IActionResult> UploadDriveInformation([FromForm] UploadLicenseInfoDTO uploadLicense)
         {
             try
@@ -855,36 +860,62 @@ namespace CarRentalSystem_API.Controllers.UserControllers
             }
 
         }
-       
+
+        [Authorize(Roles = "User")]
         [HttpPost("logoutuser")]
         public async Task<IActionResult> LogoutUser()
         {
-            int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-            if (userID == 0)
+            try
             {
-                return BadRequest(new
+                int userID = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+                if (userID == 0)
                 {
-                    error = "Invalid User ID",
-                    message = "User ID is missing or invalid."
+                    return BadRequest(new
+                    {
+                        error = "Invalid User ID",
+                        message = "User ID is missing or invalid."
+                    });
+                }
+                var user = await _db.Users.FindAsync(userID);
+                if (user == null)
+                {
+                    return NotFound(new
+                    {
+                        error = "User Not Found",
+                        message = $"User with ID {userID} not found."
+                    });
+                }
+
+                // empty the token field for all active tokens of the user to invalidate them
+                var token = await _db.TokenActivities.Where(x => x.UserID == userID && x.Role == user.Role && x.Token != null).ToListAsync();
+
+                // change the text
+                if (token != null)
+                {
+                    foreach (var t in token)
+                    {
+                        t.Token = "";
+                        t.AllowRefreshToken = "";
+                        t.Message = $"User {user.Email} logged out. Token invalidated.";
+                        t.Time = DateTime.Now;
+                    }
+                }
+
+                await _db.SaveChangesAsync();
+                return Ok(new
+                {
+                    message = "Logout Successful",
+                    Details = "Your session has been successfully terminated. All active tokens have been invalidated. Please log in again to access your account."
                 });
             }
-            var user = await _db.Users.FindAsync(userID);
-            if (user == null)
+            catch (Exception ex)
             {
-                return NotFound(new
+                return StatusCode(500, new
                 {
-                    error = "User Not Found",
-                    message = $"User with ID {userID} not found."
+                    error = "Logout Failed",
+                    message = "An error occurred during logout. Please try again later." + ex.Message
                 });
             }
-            var token = await _db.TokenActivities.Where(x => x.UserID == userID && x.Role == user.Role && x.Token != null).ToListAsync();
-            token.ForEach(x => x.Token = $"This token is invalidated at {DateTime.Now}. User logged out.");
-            await _db.SaveChangesAsync();
-            return Ok(new
-            {
-                message = "Logout Successful",
-                Details = "Your session has been successfully terminated. All active tokens have been invalidated. Please log in again to access your account."
-            });
         }
     }
 }

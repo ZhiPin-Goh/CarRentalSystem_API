@@ -8,7 +8,6 @@ namespace CarRentalSystem_API.Controllers.UserControllers
     [ApiController]
     [Route("api/user/delivery")]
     [Tags("User Delivery Management")]
-    [Authorize(Roles = "User")]
     public class DeliveryUserController : Controller
     {
         private readonly AppDbContext _db;

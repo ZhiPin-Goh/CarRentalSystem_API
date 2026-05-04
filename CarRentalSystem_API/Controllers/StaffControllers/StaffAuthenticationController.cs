@@ -171,7 +171,16 @@ namespace CarRentalSystem_API.Controllers.StaffControllers
                     message = "No user found with the provided ID. Please check your login status and try again."
                 });
             var token = await _db.TokenActivities.Where(x => x.UserID == staffID && x.Role == staff.Role && x.Token != null).ToListAsync();
-            token.ForEach(x => x.Token = $"This token is invalidated at {DateTime.Now}. User logged out.");
+            if(token!= null)
+            {
+                foreach (var t in token)
+                {
+                    t.Token = "";
+                    t.AllowRefreshToken = "";
+                    t.Message = $"Staff: {staff.UserName} logged out, token invalidated.";
+                    t.Time = DateTime.Now;
+                }
+            }
             await _db.SaveChangesAsync();
             return Ok(new
             {

@@ -54,7 +54,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             var vehicles = await _db.Vehicles
                 .Where(v => v.Status == "Available" || v.Status == "Rented")
                 .Include(v => v.VehicleImages)
-                .Take(6)
+                .Take(10)
                 .Select(v => new
                 {
                     v.VehicleID,
@@ -132,17 +132,22 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             }).ToListAsync();
             return Ok(result);
         }
-        [HttpGet]
+        [HttpGet("search")]
         public async Task<IActionResult> SearchVehicle(
-           [FromQuery] string? brand,
-           [FromQuery] string? type,
-           [FromQuery] decimal? maxPrice,
-           [FromQuery] DateTime? startDate,
-           [FromQuery] DateTime? endDate)
+     [FromQuery] string searchName,
+     [FromQuery] string? brand,
+     [FromQuery] string? type,
+     [FromQuery] decimal? maxPrice,
+     [FromQuery] DateTime? startDate,
+     [FromQuery] DateTime? endDate)
         {
             try
             {
                 IQueryable<Vehicle> query = _db.Vehicles.Include(v => v.VehicleImages);
+                if (!string.IsNullOrEmpty(searchName))
+                {
+                    query = query.Where(v => v.Brand.Contains(searchName) || v.Model.Contains(searchName));
+                }
                 if (startDate.HasValue && endDate.HasValue)
                 {
                     if (startDate.Value >= endDate.Value)
@@ -202,6 +207,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 });
             }
         }
+
         [HttpGet("{licensePlate}")]
         public async Task<IActionResult> SearchVehicle(string licensePlate)
         {

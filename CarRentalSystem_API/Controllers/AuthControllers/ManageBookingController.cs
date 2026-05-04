@@ -489,7 +489,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
         [HttpPost("{bookingid}")]
         public async Task<IActionResult> CancelBooking(int bookingid)
         {
-            var existingBooking = await _db.Bookings.FirstOrDefaultAsync(x => x.BookingID == bookingid);
+            var existingBooking = await _db.Bookings.Include(x => x.User).Include(x => x.Vehicle).FirstOrDefaultAsync(x => x.BookingID == bookingid);
             if (existingBooking == null)
                 return NotFound(new
                 {
@@ -529,6 +529,14 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 _db.Transactions.Add(transactionRecord);
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
+                _ = Task.Run(() => GeneralServices.CancelReceiptPdf(
+                    username: existingBooking.User.UserName,
+                    email: existingBooking.User.Email,
+                    transactionCode: transactionRecord.TransactionID.ToString(),
+                    vehicleName: $"{existingBooking.Vehicle.Brand} {existingBooking.Vehicle.Model}",
+                    originalAmount: existingBooking.FinalPaidAmount,
+                    refundAmount: refundAmount
+                    ));
                 return Ok(new
                 {
                     message = "Booking cancelled successfully",

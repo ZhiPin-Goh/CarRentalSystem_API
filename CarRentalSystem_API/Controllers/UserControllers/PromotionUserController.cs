@@ -8,7 +8,6 @@ namespace CarRentalSystem_API.Controllers.UserControllers
     [ApiController]
     [Route("api/user/promotion")]
     [Tags("User Promotion Management")]
-    [Authorize(Roles = "User")]
     public class PromotionUserController : Controller
     {
         private readonly AppDbContext _db;
