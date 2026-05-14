@@ -152,7 +152,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
         }
         [HttpGet("search")]
         public async Task<IActionResult> SearchVehicle(
-            [FromQuery] string searchName,
+            [FromQuery] string? searchName,
             [FromQuery] string? brand,
             [FromQuery] string? type,
             [FromQuery] decimal? maxPrice,

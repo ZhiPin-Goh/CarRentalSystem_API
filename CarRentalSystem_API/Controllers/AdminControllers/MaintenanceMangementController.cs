@@ -58,7 +58,7 @@ namespace CarRentalSystem_API.Controllers.AdminControllers
             }
 
             var vehicle = await _db.Vehicles.FirstOrDefaultAsync(v => v.VehicleID == createMaintenance.VehicleID);
-            if (vehicle != null && vehicle.Status != "Maintenance")
+            if (createMaintenance.StartDate.Day == DateTime.Now.Day)
             {
                 vehicle.Status = "Maintenance";
             }

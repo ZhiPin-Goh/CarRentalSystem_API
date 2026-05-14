@@ -1,67 +1,25 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata.Internal;
+﻿using CarRentalSystem_API.Interface;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
-using System.ComponentModel;
 using System.Net.Mail;
 
 namespace CarRentalSystem_API.Function
 {
-    public class GeneralServices
+    public class PdfService : IPdfService
     {
-        private readonly IConfiguration _config;
-        private readonly ILogger _logger;
-        public GeneralServices(IConfiguration config, ILogger logger) 
+        private readonly ILogger<PdfService> _logger;
+        private readonly IEmailService _emailServices;
+        public PdfService(ILogger<PdfService> logger, IEmailService emailServices)
         {
-            _config = config;
+            _emailServices = emailServices;
             _logger = logger;
         }
-        public static string GenerateNumber(int length)
-        {
-            Random random = new Random();
-            return new string(Enumerable.Repeat("0123456789", length)
-              .Select(s => s[random.Next(s.Length)]).ToArray());
-        }
-      
-        public static async Task SendEmailPdf(string email, string subject, string body, byte[] pdfBytes, string fileName)
-        {
-            try
-            {
-                string senderEmail = "gohzp1227@gmail.com";
-                string senderDisplayName = "Drive Link";
-
-                MailAddress fromAddress = new MailAddress(senderEmail, senderDisplayName);
-                MailAddress toAddress = new MailAddress(email);
-
-                using MailMessage msg = new MailMessage(fromAddress, toAddress)
-                {
-                    Subject = subject,
-                    Body = body,
-                    BodyEncoding = System.Text.Encoding.UTF8,
-                    IsBodyHtml = true
-                };
-
-                using MemoryStream pdfStream = new MemoryStream(pdfBytes);
-                msg.Attachments.Add(new Attachment(pdfStream, fileName, "application/pdf"));
-
-                using SmtpClient client = new SmtpClient("smtp.gmail.com", 587)
-                {
-                    EnableSsl = true,
-                    UseDefaultCredentials = false,
-                    Credentials = new System.Net.NetworkCredential(senderEmail, "vooeszhogwzzrhoj")
-                };
-                await client.SendMailAsync(msg);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Failed to send email: " + ex.Message);
-            }
-        }
-        public static async Task InvoicePdf(string username, string email, string transactionCode, decimal vehicleAmount, int totalDate, string vehicleName)
+        public async Task InvoicePdfAsync(string userName, string email, string transactionCode, decimal vehicleAmount, int totalDate, string vehicleName)
         {
             var currentDate = DateTime.Now;
             decimal subTotal = vehicleAmount * totalDate;
-            var invoiceNo = $"INV-{currentDate:yyyyMMdd}-{GenerateNumber(4)}";
+            var invoiceNo = $"INV-{currentDate:yyyyMMdd}-{GeneralServices.GenerateNumber(4)}";
 
             byte[] pdfBytes = Document.Create(container =>
             {
@@ -77,7 +35,7 @@ namespace CarRentalSystem_API.Function
                     {
                         row.RelativeItem().Column(col =>
                         {
-                            col.Item().Text("Drive Link").SemiBold().FontSize(32).FontColor("#1d4ed8"); 
+                            col.Item().Text("Drive Link").SemiBold().FontSize(32).FontColor("#1d4ed8");
                             col.Item().Text("No. 104, Ground Floor, Taman City, \nJalan Kuching, 51200, Kuala Lumpur, \nWilayah Persekutuan, Malaysia");
                             col.Item().Text("Tel: +60 123-456-7890");
                         });
@@ -94,8 +52,9 @@ namespace CarRentalSystem_API.Function
                     {
                         col.Spacing(15);
 
-                        col.Item().BorderBottom(1).BorderColor("#ccc").PaddingBottom(10).Column(c => {
-                            c.Item().Text($"Bill To: {username}").FontSize(16).SemiBold();
+                        col.Item().BorderBottom(1).BorderColor("#ccc").PaddingBottom(10).Column(c =>
+                        {
+                            c.Item().Text($"Bill To: {userName}").FontSize(16).SemiBold();
                             c.Item().Text($"Email: {email}");
                             c.Item().Text($"Transaction Code: {transactionCode}");
                         });
@@ -135,28 +94,20 @@ namespace CarRentalSystem_API.Function
             try
             {
                 string filePath = $"Invoice_{invoiceNo}.pdf";
-                await SendEmailPdf(email, "Your Invoice from Drive Link", "Thank you for your booking! Please find attached your invoice.", pdfBytes, filePath);
+                await _emailServices.SendEmailPdfAsync(email, "Your Rental Invoice", $"Dear {userName},\n\nPlease find attached your rental invoice for transaction code {transactionCode}.\n\nBest regards,\nDrive Link Team", pdfBytes, filePath);
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Failed to send email: " + ex.Message);
+                _logger.LogError(ex, "Failed to send invoice email to {Email} for transaction {TransactionCode}", email, transactionCode);
             }
         }
-
-        public static async Task ExtensionInvoicePdf(
-            string username,
-            string email,
-            string transactionCode,
-            string vehicleName,
-            decimal dailyRate,
-            DateTime oldEndDate,
-            DateTime newEndDate)
+        public async Task ExtensionInvoicePdfAsync(string userName, string email, string transactionCode, string vehicleName, decimal dailyRate, DateTime oldEndDate, DateTime newEndDate)
         {
             QuestPDF.Settings.License = LicenseType.Community;
 
             int extraDays = (newEndDate - oldEndDate).Days;
             decimal extraCost = dailyRate * extraDays;
-            var invoiceNo = $"INV-{DateTime.Now.ToString("yyyy-MM-dd")}-{GenerateNumber(4)}";
+            var invoiceNo = $"INV-{DateTime.Now.ToString("yyyy-MM-dd")}-{GeneralServices.GenerateNumber(4)}";
 
             byte[] pdfBytes = Document.Create(container =>
             {
@@ -183,7 +134,7 @@ namespace CarRentalSystem_API.Function
                     page.Content().PaddingVertical(1, Unit.Centimetre).Column(col =>
                     {
                         col.Spacing(10);
-                        col.Item().Text($"Bill To: {username}").Bold();
+                        col.Item().Text($"Bill To: {userName}").Bold();
                         col.Item().Text($"Email: {email}");
                         col.Item().LineHorizontal(1);
 
@@ -228,18 +179,19 @@ namespace CarRentalSystem_API.Function
             }).GeneratePdf();
             try
             {
-                await SendEmailPdf(email, $"Extension Invoice: {vehicleName}", "Your booking extension has been confirmed. Please find the receipt attached.", pdfBytes, $"{invoiceNo}.pdf"); await SendEmailPdf(email, $"Extension Invoice: {vehicleName}", "Your booking extension has been confirmed. Please find the receipt attached.", pdfBytes, $"{invoiceNo}.pdf");
+                await _emailServices.SendEmailPdfAsync(email, $"Extension Invoice: {vehicleName}", "Your booking extension has been confirmed. Please find the receipt attached.", pdfBytes, $"{invoiceNo}.pdf");
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Failed to send email: " + ex.Message);
+                _logger.LogError(ex, $"Failed to send extension invoice email to {email} for transaction {transactionCode}");
             }
         }
-        public static async Task CancelReceiptPdf(string username, string email, string transactionCode, string vehicleName, decimal originalAmount, decimal refundAmount)
+        public async Task CancelReceiptPdfAsync(string userName, string email, string transactionCode, string vehicleName, decimal originalAmount, decimal refundAmount)
         {
+
             QuestPDF.Settings.License = LicenseType.Community;
             decimal penaltyAmount = originalAmount - refundAmount;
-            var invoiceNo = $"CNCL-{DateTime.Now:yyyy-MM-dd}-{GenerateNumber(4)}";
+            var invoiceNo = $"CNCL-{DateTime.Now:yyyy-MM-dd}-{GeneralServices.GenerateNumber(4)}";
 
             byte[] pdfBytes = Document.Create(container =>
             {
@@ -250,12 +202,15 @@ namespace CarRentalSystem_API.Function
                     page.DefaultTextStyle(x => x.FontSize(12));
 
                     //Header
-                    page.Header().Row(row => {
-                        row.RelativeItem().Column(col => {
+                    page.Header().Row(row =>
+                    {
+                        row.RelativeItem().Column(col =>
+                        {
                             col.Item().Text("Drive Link").SemiBold().FontSize(30).FontColor("#dc2626");
                             col.Item().Text("Cancellation Receipt / Credit Note").FontSize(14).Italic();
                         });
-                        row.ConstantItem(150).Column(col => {
+                        row.ConstantItem(150).Column(col =>
+                        {
                             col.Item().Text($"Receipt No: {invoiceNo}").Bold();
                             col.Item().Text($"Date: {DateTime.Now:dd MMM yyyy}");
                         });
@@ -265,7 +220,7 @@ namespace CarRentalSystem_API.Function
                     page.Content().PaddingVertical(1, Unit.Centimetre).Column(col =>
                     {
                         col.Spacing(10);
-                        col.Item().Text($"Bill To: {username}").Bold();
+                        col.Item().Text($"Bill To: {userName}").Bold();
                         col.Item().Text($"Email: {email}");
                         col.Item().LineHorizontal(1);
 
@@ -276,12 +231,14 @@ namespace CarRentalSystem_API.Function
                         col.Item().PaddingTop(15).Text("Refund Details").FontSize(16).SemiBold();
                         col.Item().Table(table =>
                         {
-                            table.ColumnsDefinition(c => {
+                            table.ColumnsDefinition(c =>
+                            {
                                 c.RelativeColumn(3);
-                                c.RelativeColumn(1); 
+                                c.RelativeColumn(1);
                             });
 
-                            table.Header(h => {
+                            table.Header(h =>
+                            {
                                 h.Cell().BorderBottom(1).PaddingBottom(5).Text("Description").Bold();
                                 h.Cell().BorderBottom(1).PaddingBottom(5).AlignRight().Text("Amount").Bold();
                             });
@@ -302,7 +259,8 @@ namespace CarRentalSystem_API.Function
                         col.Item().PaddingTop(20).Text("* Refund process has been initiated. Please allow 3-5 business days for the funds to reflect in your original payment method.").FontSize(10).Italic();
                     });
 
-                    page.Footer().AlignCenter().Text(x => {
+                    page.Footer().AlignCenter().Text(x =>
+                    {
                         x.Span("Cancellation Receipt for Transaction: ");
                         x.Span(transactionCode).Bold();
                     });
@@ -312,12 +270,13 @@ namespace CarRentalSystem_API.Function
 
             try
             {
-                await SendEmailPdf(email, $"Cancellation Receipt: {vehicleName}", "Your booking has been cancelled. Please find the cancellation receipt attached.", pdfBytes, $"{invoiceNo}.pdf");
+                await _emailServices.SendEmailPdfAsync(email, $"Cancellation Receipt: {vehicleName}", "Your booking has been cancelled. Please find the cancellation receipt attached.", pdfBytes, $"{invoiceNo}.pdf");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to send email: {ex.Message}");
+                _logger.LogError(ex, $"Failed to send cancellation receipt email to {email} for transaction {transactionCode}");
             }
         }
     }
 }
+

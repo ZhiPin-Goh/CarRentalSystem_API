@@ -1,11 +1,16 @@
+using CarRentalSystem_API.Function;
 using CarRentalSystem_API.Function.BackgroundServices;
+using CarRentalSystem_API.Interface;
 using CarRentalSystem_API.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,7 +25,11 @@ builder.Services.AddControllers()
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 
-// This is Swagger configuration with JWT authentication
+// Email configuration injection
+builder.Services.AddTransient<IEmailService, EmailServices>();
+
+// PDF configuration injection
+builder.Services.AddTransient<IPdfService, PdfService>(); 
 builder.Services.AddSwaggerGen(x =>
 {
     x.SwaggerDoc("v1", new OpenApiInfo
@@ -51,6 +60,42 @@ builder.Services.AddSwaggerGen(x =>
         }
 
     });
+});
+
+// Security configuration (Rate Limiting) // This is global rate limiting policy, you can also create different policies for different endpoints if needed.
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("GlobalPolicy", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 2,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }
+    ));
+    options.AddPolicy("StrictPolicy", httpContext =>
+         RateLimitPartition.GetFixedWindowLimiter(
+             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+             factory: _ => new FixedWindowRateLimiterOptions
+             {
+                 PermitLimit = 5,
+                 Window = TimeSpan.FromMinutes(1)
+             }
+    ));
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json";
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            success = false,
+            error = "Too Many Requests",
+            message = "You have exceeded the allowed number of requests. Please try again later."
+        }, token);
+    };
 });
 
 // This is JWT authentication configuration
@@ -98,6 +143,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         }
     };
 });
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 // Add DbContext with SQL Server connection string from appsettings.json
 builder.Services.AddDbContext<AppDbContext>
    (options => options
@@ -122,6 +168,7 @@ builder.Services.AddHostedService<PromotionStatusUpdateServices>();
 builder.Services.AddHostedService<TripRemindersServices>();
 builder.Services.AddHostedService<UserStatusDeleteServices>();
 builder.Services.AddHostedService<VehicleStatusUpdateService>();
+builder.Services.AddHostedService<IdempotencyCleanupService>();
 
 var app = builder.Build();
 app.UseStaticFiles();
@@ -131,12 +178,23 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+// This is to get the real client IP address when the application is behind a reverse proxy (e.g., Nginx, Apache) or load balancer, which is important for rate limiting and logging.
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+});
 app.UseRouting();
+
+// This is global rate limiting middleware, you can also apply rate limiting policy to specific endpoints if needed.
+app.UseRateLimiter();
 
 // This is global exception handling middleware (jwt)
 app.UseAuthentication(); 
 app.UseAuthorization();
 
-app.MapControllers();
+// This is global rate limiting middleware, you can also apply rate limiting policy to specific endpoints if needed.
+app.MapControllers().RequireRateLimiting("GlobalPolicy"); // Apply global rate limiting policy to all endpoints
+
+
 
 app.Run();

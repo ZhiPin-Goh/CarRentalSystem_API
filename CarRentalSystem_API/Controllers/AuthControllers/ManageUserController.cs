@@ -3,7 +3,6 @@ using CarRentalSystem_API.Function;
 using CarRentalSystem_API.Models;
 using CloudinaryDotNet;
 using Microsoft.AspNetCore.Mvc;
-using CarRentalSystem_API.Function;
 using Microsoft.EntityFrameworkCore;
 using Scrypt;
 using System.Security.Claims;
@@ -11,6 +10,7 @@ using CloudinaryDotNet.Actions;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
+using CarRentalSystem_API.Interface;
 
 namespace CarRentalSystem_API.Controllers.AuthControllers
 {
@@ -21,14 +21,16 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
     {
         private readonly AppDbContext _db;
         private readonly IConfiguration _config;
+        private readonly IEmailService _emailService;
         private static string phonePattern = @"^01[0-9]-\d{7,8}$";
         private static string passwordPattern = @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$";
         private static string emailPattern = @"^.+@.+$";
         private static ScryptEncoder encoder = new ScryptEncoder();
-        public ManageUserController(AppDbContext db, IConfiguration config)
+        public ManageUserController(AppDbContext db, IConfiguration config, IEmailService emailService)
         {
             _db = db;
             _config = config;
+            _emailService = emailService;
         }
         [HttpGet]
         public async Task<IActionResult> GetAllUser()
@@ -255,7 +257,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 </html>";
             try
             {
-                await GeneralServices.SendEmail(createUser.Email, "Account Verification OTP", emailBody);
+                await _emailService.SendEmailAsync(createUser.Email, "Account Verification OTP", emailBody);
                 return Ok(new
                 {
 
@@ -406,7 +408,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 </html>";
             try
             {
-                await GeneralServices.SendEmail(user.Email, "Resend OTP for Account Verification", emailBody);
+                await _emailService.SendEmailAsync(user.Email, "Resend OTP for Account Verification", emailBody);
                 return Ok(new
                 {
                     message = "OTP resent successfully. Please check your email for the new OTP.",
@@ -500,7 +502,7 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 </html>";
             try
             {
-                await GeneralServices.SendEmail(user.Email, "Password Reset Authorization Code", emailBody);
+                await _emailService.SendEmailAsync(user.Email, "Password Reset Authorization Code", emailBody);
                 return Ok(new
                 {
                     message = "Password reset email sent successfully. Please check your email for the OTP to reset your password.",

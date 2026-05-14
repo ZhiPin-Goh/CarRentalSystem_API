@@ -1,11 +1,13 @@
 ﻿using CarRentalSystem_API.DTO.AuthTokenDTO;
 using CarRentalSystem_API.DTO.UserDTO;
 using CarRentalSystem_API.Function;
+using CarRentalSystem_API.Interface;
 using CarRentalSystem_API.Models;
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Linq;
@@ -24,15 +26,16 @@ namespace CarRentalSystem_API.Controllers.UserControllers
     {
         private readonly AppDbContext _db;
         private readonly IConfiguration _config;
+        private readonly IEmailService _emailService;
         private static string phonePattern = @"^01[0-9]-\d{7,8}$";
         private static string passwordPattern = @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$";
         private static string emailPattern = @"^.+@.+$";
         private static ScryptEncoder encoder = new ScryptEncoder();
-        public UserAuthenticationController(AppDbContext db, IConfiguration config)
+        public UserAuthenticationController(AppDbContext db, IConfiguration config, IEmailService emailService)
         {
             _db = db;
             _config = config;
-
+            _emailService = emailService;
         }
         [Authorize(Roles = "User")]
         [HttpGet("profile")]
@@ -188,7 +191,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 </html>";
             try
             {
-                await GeneralServices.SendEmail(createUser.Email, "Account Verification OTP", emailBody);
+                await _emailService.SendEmailAsync(createUser.Email, "Account Verification OTP", emailBody);
                 return Ok(new
                 {
 
@@ -339,7 +342,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 </html>";
             try
             {
-                await GeneralServices.SendEmail(user.Email, "Resend OTP for Account Verification", emailBody);
+                await _emailService.SendEmailAsync(user.Email, "Resend OTP for Account Verification", emailBody);
                 return Ok(new
                 {
                     message = "OTP resent successfully. Please check your email for the new OTP.",
@@ -433,7 +436,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                 </html>";
             try
             {
-                await GeneralServices.SendEmail(user.Email, "Password Reset Authorization Code", emailBody);
+                await _emailService.SendEmailAsync(user.Email, "Password Reset Authorization Code", emailBody);
                 return Ok(new
                 {
                     message = "Password reset email sent successfully. Please check your email for the OTP to reset your password.",
@@ -522,6 +525,7 @@ namespace CarRentalSystem_API.Controllers.UserControllers
             });
         }
         [AllowAnonymous]
+        [EnableRateLimiting("StrictPolicy")]
         [HttpPost("loginuser")]
         public async Task<IActionResult> LoginUser([FromBody] LoginDTO login)
         {
@@ -623,11 +627,17 @@ namespace CarRentalSystem_API.Controllers.UserControllers
                     message = "The provided refresh token is invalid or does not match the access token."
                 });
             if (activity.Time.AddDays(7) < DateTime.Now)
+            {
+                activity.Time = DateTime.Now;
+                activity.Message = "Refresh token expired. Please log in again.";
+                _db.Entry(activity).State = EntityState.Modified;
+                await _db.SaveChangesAsync();
                 return BadRequest(new
                 {
                     error = "Refresh token expired",
                     message = "The provided refresh token has expired. Please log in again."
                 });
+            }
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(_config["Jwt:Key"]);

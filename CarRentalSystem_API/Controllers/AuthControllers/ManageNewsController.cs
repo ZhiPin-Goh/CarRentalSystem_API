@@ -36,6 +36,26 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                 .ToListAsync();
             return Ok(news);
         }
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetNews(int id)
+        {
+            var news = await _db.News.Where(x => x.NewsID == id)
+                .Select(x => new
+                {
+                    x.NewsID,
+                    x.Title,
+                    x.Content,
+                    x.PublishedDate,
+                    x.IsPublished
+                }).FirstOrDefaultAsync();
+            if (news == null)
+                return NotFound(new
+                {
+                    error = "News Not Found",
+                    message = $"News with ID {id} not found."
+                });
+            return Ok(news);
+        }
         [HttpPost]
         public async Task<IActionResult> CreateNews([FromBody] CreateNewsDTO createNews)
         {

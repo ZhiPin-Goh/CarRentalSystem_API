@@ -73,6 +73,136 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
             }
             return Ok(unavailableDates);
         }
+        [HttpPost]
+        public async Task<IActionResult> GetBookingPrice([FromBody] BookingPriceRequestDTO request)
+        {
+            var existingVehicle = await _db.Vehicles.FirstOrDefaultAsync(x => x.VehicleID == request.VehicleID);
+            if (existingVehicle == null)
+            {
+                return NotFound(new
+                {
+                    error = "Vehicle not found",
+                    message = $"No vehicle found with ID {request.VehicleID}"
+                });
+            }
+            if(existingVehicle.Status != "Available")
+            {
+                return BadRequest(new
+                {
+                    error = "Vehicle not available",
+                    message = $"The vehicle with ID {request.VehicleID} is currently not available for booking"
+                });
+            }
+
+            int totalDays = (request.EndDate.Date - request.StartDate.Date).Days;
+            if (totalDays <= 0)
+            {
+                return NotFound(new
+                {
+                    error = "Invalid date range",
+                    message = "End date must be greater than start date"
+                });
+            }
+            decimal deliveryPrice = 0;
+            if (request.DeliveryAreaID.HasValue)
+            {
+                var existingDeliveryArea = await _db.DeliveryAreas.FirstOrDefaultAsync(x => x.AreaID == request.DeliveryAreaID.Value && x.IsActive == true);
+                if (existingDeliveryArea == null)
+                {
+                    return NotFound(new
+                    {
+                        error = "Delivery area not found",
+                        message = $"No active delivery area found with ID {request.DeliveryAreaID.Value}"
+                    });
+                }
+                deliveryPrice = existingDeliveryArea.Fee;
+            }
+
+            decimal carRentalPrice = existingVehicle.DailyRate * totalDays;
+            decimal discountAmount = 0;
+            int? appliedPromotionID = null;
+            if (!string.IsNullOrEmpty(request.PromoCode))
+            {
+                var promotion = await _db.Promotions.FirstOrDefaultAsync(x => x.PromotionCode == request.PromoCode &&
+                x.StartDate <= DateTime.Today &&
+                x.EndDate >= DateTime.Today &&
+                x.IsActive == true);
+                if (promotion == null)
+                    return NotFound(new
+                    {
+                        error = "Promotion not found",
+                        message = $"No active promotion found with code {request.PromoCode}"
+                    });
+                switch (promotion.PromotionScope)
+                {
+                    case "Global":
+                        break;
+                    case "ModelSpecific":
+                        if (existingVehicle.Model.ToLower() != promotion.ApplicableModel.ToLower())
+                        {
+                            return BadRequest(new { error = "Invalid promotion", message = $"Promotion code {request.PromoCode} is only applicable for {promotion.ApplicableModel} model vehicles" });
+                        }
+                        break;
+                    case "MinSpend":
+                        if (carRentalPrice < promotion.TargetValue)
+                        {
+                            return BadRequest(new { error = "Invalid promotion", message = $"Promotion code {request.PromoCode} requires a minimum spend of RM {promotion.TargetValue:F2}" });
+                        }
+                        break;
+                    default:
+                        return BadRequest(new { error = "Invalid promotion scope", message = $"Promotion code {request.PromoCode} has an unsupported promotion scope" });
+                }
+                decimal theoreticalDiscount = (carRentalPrice * promotion.DiscountPercentage) / 100;
+
+                if (promotion.MaxDiscountAmount.HasValue && theoreticalDiscount > promotion.MaxDiscountAmount.Value)
+                {
+                    discountAmount = promotion.MaxDiscountAmount.Value;
+                }
+                else
+                {
+                    discountAmount = theoreticalDiscount;
+                }
+
+                appliedPromotionID = promotion.PromotionID;
+            }
+
+            decimal calculatedTotalPrice = carRentalPrice + deliveryPrice;
+            decimal finalPrice = calculatedTotalPrice - discountAmount;
+            if (finalPrice < 0) finalPrice = 0;
+            return Ok(new
+            {
+                VehicleID = existingVehicle.VehicleID,
+                VehicleName = $"{existingVehicle.Brand} {existingVehicle.Model}",
+                TotalDays = totalDays,
+                CarRentalPrice = carRentalPrice,
+                DeliveryPrice = deliveryPrice,
+                DiscountAmount = discountAmount,
+                FinalPrice = finalPrice,
+                AppliedPromotionID = appliedPromotionID
+            });
+
+        }
+        [HttpGet]
+        public async Task<IActionResult> GetUnavailableExtendDates([FromQuery] UnavailableExtendDatesDTO request)
+        {
+            var query = _db.Bookings.Where(x => x.VehicleID == request.VehicleID &&
+                    (x.Status == "Pending" || x.Status == "Confirmed" || x.Status == "InProgress") &&
+                    x.EndDate >= DateTime.Today);
+
+            if (request.ExcludeBookingID.HasValue)
+            {
+                query = query.Where(x => x.BookingID != request.ExcludeBookingID.Value);
+            }
+            var unavailablePeriods = await query
+                .Select(x => new
+                {
+                    Start = x.StartDate.ToString("yyyy-MM-dd"),
+                    End = x.EndDate.ToString("yyyy-MM-dd")
+                })
+                .ToListAsync();
+
+            return Ok(unavailablePeriods);
+        }
         [HttpGet]
         public async Task<IActionResult> GetAllBooking()
         {
@@ -372,22 +502,22 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
         [HttpPost]
         public async Task<IActionResult> ExtendBooking([FromBody] ExtendBookingDTO extendBooking)
         {
-            var existingBooking = await _db.Bookings.FirstOrDefaultAsync(x => x.BookingID == extendBooking.BookingID);
+            var existingBooking = await _db.Bookings.Include(x => x.Vehicle).Include(x => x.User).FirstOrDefaultAsync(x => x.BookingID == extendBooking.BookingID);
             if (existingBooking == null)
                 return NotFound(new
                 {
                     error = "Booking not found",
                     message = $"No booking found with ID {extendBooking.BookingID}"
                 });
-            if (existingBooking.EndDate >= extendBooking.NewDateTime)
+            if (existingBooking.EndDate.Date >= extendBooking.NewDateTime.Date)
                 return BadRequest(new
                 {
                     error = "Invalid date range",
                     message = "New end date must be greater than current end date"
                 });
-            int todayDate = (extendBooking.NewDateTime - existingBooking.EndDate).Days;
-            if (todayDate > 30)
-            return BadRequest(new
+            int extraDays = (extendBooking.NewDateTime.Date - existingBooking.EndDate.Date).Days;
+            if (extraDays > 30)
+                return BadRequest(new
                 {
                     error = "Invalid date range",
                     message = "Extension cannot be longer than 30 days"
@@ -405,8 +535,8 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     error = "Date conflict",
                     message = "The new end date conflicts with another booking for the same vehicle"
                 });
-            int extraDays = (extendBooking.NewDateTime - existingBooking.EndDate).Days;
             decimal extraCost = extraDays * existingBooking.Vehicle.DailyRate;
+
             return Ok(new
             {
                 message = "Booking can be extended",
@@ -489,75 +619,80 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
         [HttpPost("{bookingid}")]
         public async Task<IActionResult> CancelBooking(int bookingid)
         {
-            var existingBooking = await _db.Bookings.Include(x => x.User).Include(x => x.Vehicle).FirstOrDefaultAsync(x => x.BookingID == bookingid);
+            var existingBooking = await _db.Bookings
+                .Include(x => x.User)
+                .Include(x => x.Vehicle)
+                .FirstOrDefaultAsync(x => x.BookingID == bookingid);
+
             if (existingBooking == null)
-                return NotFound(new
-                {
-                    error = "Booking not found",
-                    message = $"No booking found with ID {bookingid}"
-                });
+                return NotFound(new { error = "Booking not found", message = $"No booking found with ID {bookingid}" });
+
             if (existingBooking.Status != "Pending" && existingBooking.Status != "Confirmed")
-                return BadRequest(new
-                {
-                    error = "Invalid booking status",
-                    message = "Only bookings with Pending or Confirmed status can be cancelled"
-                });
+                return BadRequest(new { error = "Invalid status", message = "Only Pending or Confirmed bookings can be cancelled." });
 
             using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
-                decimal refundAmount;
                 var timeUntilStart = existingBooking.StartDate - DateTime.Now;
-                if (timeUntilStart.TotalHours >= 24)
-                    return BadRequest(new
+
+                if (timeUntilStart.TotalHours < 0)
+                    return BadRequest(new { error = "Too late", message = "Cannot cancel a booking that has already started." });
+
+                decimal refundAmount = 0;
+                Transaction? transactionRecord = null;
+
+                if (existingBooking.Status == "Confirmed")
+                {
+                    if (timeUntilStart.TotalHours >= 24)
                     {
-                        error = "Cancellation not allowed",
-                        message = "Bookings can only be cancelled within 24 hours of the start date"
-                    });
-                else
-                {
-                    refundAmount = existingBooking.FinalPaidAmount * 0.5m; // 50% refund if cancelled within 24 hours of start date
+                        refundAmount = existingBooking.FinalPaidAmount;
+                    }
+                    else
+                    {
+                        refundAmount = existingBooking.FinalPaidAmount * 0.5m;
+                    }
+
+                    // 生成退款记录
+                    transactionRecord = new Transaction
+                    {
+                        BookingID = existingBooking.BookingID,
+                        Amount = refundAmount,
+                        TransactionDate = DateTime.Now,
+                        Type = "Refund for Booking Cancellation",
+                        Status = "Completed"
+                    };
+                    _db.Transactions.Add(transactionRecord);
                 }
-                var transactionRecord = new Transaction
-                {
-                    BookingID = existingBooking.BookingID,
-                    Amount = refundAmount,
-                    TransactionDate = DateTime.Now,
-                    Type = "Refund for Booking Cancellation",
-                    Status = "Completed"
-                };
-                _db.Transactions.Add(transactionRecord);
+
+                existingBooking.Status = "Cancelled";
+
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
-                _ = Task.Run(() => GeneralServices.CancelReceiptPdf(
-                    username: existingBooking.User.UserName,
-                    email: existingBooking.User.Email,
-                    transactionCode: transactionRecord.TransactionID.ToString(),
-                    vehicleName: $"{existingBooking.Vehicle.Brand} {existingBooking.Vehicle.Model}",
-                    originalAmount: existingBooking.FinalPaidAmount,
-                    refundAmount: refundAmount
+
+                if (transactionRecord != null)
+                {
+                    _ = Task.Run(() => GeneralServices.CancelReceiptPdf(
+                        username: existingBooking.User.UserName,
+                        email: existingBooking.User.Email,
+                        transactionCode: transactionRecord.TransactionID.ToString(),
+                        vehicleName: $"{existingBooking.Vehicle.Brand} {existingBooking.Vehicle.Model}",
+                        originalAmount: existingBooking.FinalPaidAmount,
+                        refundAmount: refundAmount
                     ));
+                }
+
                 return Ok(new
                 {
                     message = "Booking cancelled successfully",
                     BookingID = existingBooking.BookingID,
                     RefundAmount = refundAmount,
-                    TransactionID = transactionRecord.TransactionID,
-                    TransactionDate = transactionRecord.TransactionDate
+                    HasRefund = refundAmount > 0
                 });
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return StatusCode(500, new
-                {
-                    error = "Booking cancellation failed",
-                    message = ex.Message
-                });
-            }
-            finally
-            {
-                await transaction.DisposeAsync();
+                return StatusCode(500, new { error = "Cancellation failed", message = ex.Message });
             }
         }
     }

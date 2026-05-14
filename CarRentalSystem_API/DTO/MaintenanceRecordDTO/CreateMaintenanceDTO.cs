@@ -7,6 +7,6 @@
         public decimal Cost { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
-        public string? Handler { get; set; }
+        public string? Handler { get; set; } = string.Empty;
     }
 }

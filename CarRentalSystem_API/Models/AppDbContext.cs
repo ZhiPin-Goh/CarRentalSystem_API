@@ -20,6 +20,7 @@ namespace CarRentalSystem_API.Models
         public DbSet<HandoverReport> HandoverReports { get; set; }
         public DbSet<DeliveryArea> DeliveryAreas { get; set; }
         public DbSet<DailyFinancialSummary> DailyFinancialSummaries { get; set; }
+        public DbSet<Idempotency> Idempotencies { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -128,7 +128,8 @@ namespace CarRentalSystem_API.Controllers.AuthControllers
                     TargetURL = createBanners.TargetUrl,
                     SortOrder = createBanners.SortOrder,
                     StartDate = createBanners.StartDate,
-                    EndDate = createBanners.EndDate
+                    EndDate = createBanners.EndDate,
+                    IsActive = true
                 });
                 await _db.SaveChangesAsync();
                 return Ok(new

@@ -1,16 +1,19 @@
-﻿using CarRentalSystem_API.Models;
+﻿using CarRentalSystem_API.Interface;
+using CarRentalSystem_API.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace CarRentalSystem_API.Function.BackgroundServices
 {
-    public class TripRemindersServices :BackgroundService
+    public class TripRemindersServices : BackgroundService
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<TripRemindersServices> _logger;
-        public TripRemindersServices(IServiceProvider serviceProvider, ILogger<TripRemindersServices> logger)
+        private readonly IEmailService _emailService;
+        public TripRemindersServices(IServiceProvider serviceProvider, ILogger<TripRemindersServices> logger, IEmailService emailService)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
+            _emailService = emailService;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -22,14 +25,30 @@ namespace CarRentalSystem_API.Function.BackgroundServices
                     using (var scope = _serviceProvider.CreateScope())
                     {
                         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var tomorrowStart = DateTime.Now.Date.AddDays(1);
+                        var tomorrowEnd = tomorrowStart.AddDays(1).AddTicks(-1);
                         var upcomingTrips = await db.Bookings
                             .Include(b => b.User)
                             .Include(b => b.Vehicle)
-                            .Where(b => b.StartDate > DateTime.UtcNow && b.StartDate <= DateTime.Now.AddDays(24) && b.Status == "Confirmed")
+                            .Where(b =>
+                                b.StartDate >= tomorrowStart &&
+                                b.StartDate <= tomorrowEnd &&
+                                b.Status == "Confirmed"
+                            )
                             .ToListAsync(stoppingToken);
 
-                        foreach(var booking in upcomingTrips)
+                        foreach (var booking in upcomingTrips)
                         {
+                            string address = string.Empty;
+                            if (booking.DeliveryAddress == null)
+                            {
+                                // Pick up location :  No. 104, Ground Floor, Taman City, Jalan Kuching, 51200, Kuala Lumpur, Wilayah Persekutuan, Malaysia, 51200 Kuala Lumpur // 3°11'17.5"N 101°40'13.7"E
+                                address = "https://www.google.com/maps/search/?api=1&query=3.188205%2C101.670472";
+                            }
+                            else
+                            {
+                                address = booking.DeliveryAddress;
+                            }
                             string reminderEmailBody = $@"
                             <!DOCTYPE html>
                             <html>
@@ -80,7 +99,7 @@ namespace CarRentalSystem_API.Function.BackgroundServices
                                                     </tr>
                                                     <tr>
                                                         <td style=""color: #555555;"">Location:</td>
-                                                        <td style=""font-weight: bold;"">{booking.DeliveryAddress}</td>
+                                                        <td style=""font-weight: bold;"">{address}</td>
                                                     </tr>
                                                 </table>
                                             </div>
@@ -96,14 +115,14 @@ namespace CarRentalSystem_API.Function.BackgroundServices
 
                                         <div style=""background-color: #f9fafa; padding: 20px 30px; text-align: center; border-top: 1px solid #eeeeee;"">
                                             <p style=""margin: 0; color: #777777; font-size: 13px;"">Have a safe drive! <br/>The <strong style=""color: #3b82f6;"">DriveLink Team</strong></p>
-                                            <p style=""margin: 8px 0 0 0; color: #cccccc; font-size: 12px;"">&copy; 2026 DriveLink Global. All rights reserved.</p>
+                                            <p style=""margin: 8px 0 0 0; color: #cccccc; font-size: 12px;"">&copy; {DateTime.Now.Year} DriveLink Global. All rights reserved.</p>
                                         </div>
 
                                     </div>
                                 </div>
                             </body>
                             </html>";
-                            await GeneralServices.SendEmail(booking.User.Email, "Your Trip is Tomorrow! 🚗", reminderEmailBody);
+                            await _emailService.SendEmailAsync(booking.User.Email, "Your Trip is Tomorrow! 🚗", reminderEmailBody);
                         }
                     }
                 }

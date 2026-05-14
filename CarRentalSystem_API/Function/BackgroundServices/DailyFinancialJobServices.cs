@@ -28,7 +28,7 @@ namespace CarRentalSystem_API.Function.BackgroundServices
                         }
 
                         var delay = nextRunTime - today;    
-                        _logger.LogInformation("Daily financial job will run at {time}", nextRunTime);
+                        _logger.LogInformation($"Daily financial job will run at {nextRunTime}", nextRunTime);
                         await Task.Delay(delay, stoppingToken);
 
                         await ProcessDailySummary();
